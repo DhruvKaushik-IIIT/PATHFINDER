@@ -46,3 +46,6 @@ next-env.d.ts
 
 # local script output (previews, overlays)
 /out/
+
+# private seed audio (user voice notes) — kept local only, never committed
+/data/seed/voice/
