@@ -49,3 +49,6 @@ next-env.d.ts
 
 # private seed audio (user voice notes) — kept local only, never committed
 /data/seed/voice/
+
+# copied from node_modules by predev/prebuild (MapLibre web worker)
+/public/vendor/
