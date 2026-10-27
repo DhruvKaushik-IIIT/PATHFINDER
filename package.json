@@ -11,13 +11,18 @@
     "typecheck": "tsc --noEmit",
     "hello:meta": "node --env-file-if-exists=.env.local scripts/hello-meta.ts",
     "hello:baseten": "node --env-file-if-exists=.env.local scripts/hello-baseten.ts",
-    "test:tools-baseten": "node --env-file-if-exists=.env.local scripts/test-tools-baseten.ts"
+    "test:tools-baseten": "node --env-file-if-exists=.env.local scripts/test-tools-baseten.ts",
+    "test:vision": "node --env-file-if-exists=.env.local scripts/test-vision.ts",
+    "test:sam": "node --env-file-if-exists=.env.local scripts/test-sam.ts",
+    "test:voice": "node --env-file-if-exists=.env.local scripts/test-voice.ts"
   },
   "dependencies": {
+    "@meta-sam/parser": "^0.1.0",
     "next": "15.5.28",
     "openai": "^7.45.1",
     "react": "19.1.0",
     "react-dom": "19.1.0",
+    "sharp": "^0.35.5",
     "zod": "^4.6.7"
   },
   "devDependencies": {

@@ -43,3 +43,6 @@ next-env.d.ts
 
 # Meta cookbook (read-only reference, cloned locally)
 /vendor/
+
+# local script output (previews, overlays)
+/out/

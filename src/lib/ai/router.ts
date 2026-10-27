@@ -85,11 +85,17 @@ export function classifyError(err: unknown): ClassifiedError {
   if (err instanceof APIConnectionTimeoutError) {
     return { kind: "timeout", retry: true, tripBreaker: false, message };
   }
+  if (err instanceof Error && err.name === "TimeoutError") {
+    return { kind: "timeout", retry: true, tripBreaker: false, message }; // fetch + AbortSignal.timeout
+  }
   if (err instanceof APIConnectionError) {
     return { kind: "connection", retry: true, tripBreaker: false, message };
   }
-  if (err instanceof APIError) {
-    const status = err.status;
+  // OpenAI SDK errors, or our own fetch-based errors that carry an HTTP `status` (e.g. voice.ts).
+  const httpStatus =
+    err instanceof APIError ? err.status : (err as { status?: unknown } | null)?.status;
+  if (err instanceof APIError || typeof httpStatus === "number") {
+    const status = httpStatus as number | undefined;
     if (status === 401 || status === 402 || status === 403 || BILLING_RE.test(message)) {
       return { kind: "auth_or_billing", status, retry: false, tripBreaker: true, message };
     }
