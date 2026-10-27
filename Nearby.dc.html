@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Nearby</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0066CC}a:hover{color:#004E9E}
+</style>
+</helmet>
+<div style="position: relative; width: 390px; height: 844px; overflow: hidden; color: #1D1D1F; font-family: -apple-system, BlinkMacSystemFont, Inter, system-ui, sans-serif">
+<div style="position: absolute; inset: 0"><dc-import name="Map" radius="{{ yes }}" hint-size="390px,844px"></dc-import></div>
+
+<div style="position: absolute; left: 14px; right: 14px; top: 54px; display: flex; gap: 10px; align-items: center">
+<a href="Main.dc.html" aria-label="Back" style="width: 46px; height: 46px; border-radius: 50%; background: rgba(255,255,255,0.72); backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%); border: 0.5px solid rgba(255,255,255,0.8); box-shadow: 0 4px 16px rgba(0,0,0,0.12); display: flex; align-items: center; justify-content: center; color: #1D1D1F; flex-shrink: 0"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg></a>
+<div style="flex: 1; display: flex; gap: 2px; padding: 3px; border-radius: 23px; background: rgba(255,255,255,0.72); backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%); border: 0.5px solid rgba(255,255,255,0.8); box-shadow: 0 4px 16px rgba(0,0,0,0.12)">
+<button type="button" style="flex: 1; height: 38px; border: none; border-radius: 19px; background: transparent; font: inherit; font-size: 14px; font-weight: 500; color: #1D1D1F">5 km</button>
+<button type="button" style="flex: 1; height: 38px; border: none; border-radius: 19px; background: transparent; font: inherit; font-size: 14px; font-weight: 500; color: #1D1D1F">10 km</button>
+<button type="button" style="flex: 1; height: 38px; border: none; border-radius: 19px; background: #0071E3; font: inherit; font-size: 14px; font-weight: 600; color: #FFFFFF">25 km</button>
+<button type="button" style="flex: 1; height: 38px; border: none; border-radius: 19px; background: transparent; font: inherit; font-size: 14px; font-weight: 500; color: #1D1D1F">50 km</button>
+</div>
+</div>
+
+<div style="position: absolute; left: 0; right: 0; bottom: 0; top: 548px; border-radius: 30px 30px 0 0; background: rgba(250,250,252,0.78); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%); border-top: 0.5px solid rgba(255,255,255,0.8); box-shadow: 0 -10px 34px rgba(0,0,0,0.14); padding: 8px 18px 22px; display: flex; flex-direction: column; gap: 12px">
+<span style="align-self: center; width: 38px; height: 5px; border-radius: 3px; background: rgba(60,60,67,0.3)"></span>
+<p style="margin: 0; font-size: 15px; line-height: 1.4"><strong>Within 25 km of Mandi:</strong> 1 road closed, 2 slow. Avoid NH-3 towards Kullu until ~1 PM.</p>
+<div style="border-radius: 16px; background: rgba(255,255,255,0.82)">
+<a href="Disruption.dc.html" style="text-decoration: none; color: #1D1D1F; display: flex; gap: 12px; align-items: center; padding: 11px 14px; border-bottom: 0.5px solid rgba(60,60,67,0.18)"><span style="width: 10px; height: 10px; border-radius: 50%; background: #B3261E; flex-shrink: 0"></span><span style="flex: 1; display: flex; flex-direction: column"><span style="font-size: 15px; font-weight: 600">Closed · Kataula road</span><span style="font-size: 13px; color: #48484A">Debris · 14 km · 40 min ago</span></span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2.6" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
+<a href="Disruption.dc.html" style="text-decoration: none; color: #1D1D1F; display: flex; gap: 12px; align-items: center; padding: 11px 14px; border-bottom: 0.5px solid rgba(60,60,67,0.18)"><span style="width: 10px; height: 10px; border-radius: 50%; background: #C25E00; flex-shrink: 0"></span><span style="flex: 1; display: flex; flex-direction: column"><span style="font-size: 15px; font-weight: 600">One lane · near Aut</span><span style="font-size: 13px; color: #48484A">Landslide · 8 km · 12 min ago</span></span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2.6" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
+<a href="Disruption.dc.html" style="text-decoration: none; color: #1D1D1F; display: flex; gap: 12px; align-items: center; padding: 11px 14px"><span style="width: 10px; height: 10px; border-radius: 50%; background: #C25E00; flex-shrink: 0"></span><span style="flex: 1; display: flex; flex-direction: column"><span style="font-size: 15px; font-weight: 600">Slow · Pandoh stretch</span><span style="font-size: 13px; color: #48484A">Traffic · 18 km · 1 h ago</span></span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2.6" aria-hidden="true"><path d="M9 6l6 6-6 6"></path></svg></a>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() {
+return { yes: true };
+}
+}
+</script>
+</body>
+</html>
