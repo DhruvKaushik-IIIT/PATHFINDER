@@ -634,7 +634,7 @@ Real photos in seed, bug bash on phone, loading/error/empty states, performance 
 
 | Phase | Status | Notes |
 |---|---|---|
-| 0 · Setup & proof | ⬜ not started (Part A ⬜ · B ⬜ · C ⬜) | |
+| 0 · Setup & proof | 🟡 in progress (Part A ✅ · B ⬜ · C ⬜) | **A (Oct 27):** Next 15.5 + TS + Tailwind v4 (tokens go in `globals.css` `@theme`, no `tailwind.config`), pnpm, `"type":"module"`. Scripts run with plain `node` (Node 22 strips TS; imports use explicit `.ts` paths, `allowImportingTsExtensions` on) → no `tsx` dep. Router: retry/backoff, 10-min breaker, `AI_MODE`, `runJob()` never throws; `ai_calls` logging is console-only until Phase 1. **Meta works without a card** (`muse-spark-1.3`, ~$0.001/hello, ~250 reasoning tokens → use low effort for bulk). **Baseten works** (`muse-spark-open-1026`, ~1.1 s). **Baseten tool calling works** (parallel calls too) → valid agent fallback. Cookbook uses Chat Completions; Meta wants `developer` role, `tool_choice` only `auto`, no `n`/`stop`. |
 | 1 · Core engine | ⬜ | |
 | 2 · Journey | ⬜ | |
 | 3 · Nearby + live data | ⬜ | |
