@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Command Centre — Control Room</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0;background:#E7EDE3}
+a{color:#0066CC}a:hover{color:#004E9E}
+</style>
+</helmet>
+<div style="position: relative; min-height: 900px; overflow: hidden; background: #E7EDE3; color: #1D1D1F; font-family: -apple-system, BlinkMacSystemFont, Inter, system-ui, sans-serif">
+<svg viewBox="0 0 1280 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true" style="position: absolute; inset: 0; width: 100%; height: 100%">
+<rect width="1280" height="900" fill="#E7EDE3"></rect>
+<path d="M0 0 H1280 V180 C1100 150 980 230 820 200 C640 165 520 110 300 150 C180 172 80 160 0 180 Z" fill="#DCE4D7"></path>
+<path d="M900 0 C960 60 1060 70 1160 30 C1210 12 1250 10 1280 20 V0 Z" fill="#F4F6F7"></path>
+<path d="M600 340 C720 300 860 360 900 440 C940 520 860 600 760 580 C660 560 560 420 600 340 Z" fill="#D5DFCF"></path>
+<path d="M1060 0 C1040 120 990 200 930 280 C870 360 820 420 760 480 C700 540 640 590 580 640 C520 690 460 760 400 900" fill="none" stroke="#A9CBEA" stroke-width="6"></path>
+<path d="M1100 0 C1080 120 1030 210 970 290 C910 370 860 430 800 490 C740 550 680 600 620 650 C560 700 500 770 440 900" fill="none" stroke="#C7CFC2" stroke-width="12" stroke-linecap="round"></path>
+<path d="M1100 0 C1080 120 1030 210 970 290 C910 370 860 430 800 490 C740 550 680 600 620 650 C560 700 500 770 440 900" fill="none" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round"></path>
+<path d="M800 490 C900 520 1000 560 1280 580" fill="none" stroke="#FFFFFF" stroke-width="5"></path>
+</svg>
+<span style="position: absolute; left: 61%; top: 52%; width: 28px; height: 28px; border-radius: 50%; background: #C25E00; border: 3px solid #FFFFFF; box-sizing: border-box; box-shadow: 0 0 0 8px rgba(194,94,0,0.2)"></span>
+<span style="position: absolute; left: 47%; top: 70%; width: 22px; height: 22px; border-radius: 50%; background: #B3261E; border: 3px solid #FFFFFF; box-sizing: border-box"></span>
+<span style="position: absolute; left: 73%; top: 30%; width: 20px; height: 20px; border-radius: 50%; background: #C25E00; border: 3px solid #FFFFFF; box-sizing: border-box"></span>
+<span style="position: absolute; left: 86%; top: 62%; width: 18px; height: 18px; border-radius: 50%; background: #1E7B45; border: 3px solid #FFFFFF; box-sizing: border-box"></span>
+
+<div style="position: relative; max-width: 1240px; margin: 0 auto; padding: 20px; display: flex; flex-direction: column; gap: 16px">
+<header style="border-radius: 22px; background: rgba(250,250,252,0.74); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%); border: 0.5px solid rgba(255,255,255,0.85); box-shadow: 0 8px 30px rgba(0,0,0,0.1); padding: 14px 18px; display: flex; flex-wrap: wrap; gap: 12px; justify-content: space-between; align-items: center">
+<div style="display: flex; align-items: center; gap: 12px">
+<span style="width: 38px; height: 38px; border-radius: 11px; background: #0071E3; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M2 19l6-10 4 6 3-4 7 8z"></path></svg></span>
+<span style="display: flex; flex-direction: column"><span style="font-size: 17px; font-weight: 700">Command Centre</span><span style="font-size: 13px; color: #48484A">PWD Mandi Division · official account</span></span>
+</div>
+<div style="display: flex; flex-wrap: wrap; gap: 8px">
+<span style="font-size: 14px; font-weight: 600; background: rgba(255,255,255,0.8); padding: 8px 12px; border-radius: 12px">5 active</span>
+<span style="font-size: 14px; font-weight: 600; background: rgba(255,255,255,0.8); padding: 8px 12px; border-radius: 12px">3 of 4 crews free</span>
+<span style="font-size: 14px; font-weight: 600; background: rgba(255,255,255,0.8); padding: 8px 12px; border-radius: 12px">~3,800 vehicles affected</span>
+<span style="font-size: 14px; font-weight: 600; background: rgba(255,255,255,0.8); padding: 8px 12px; border-radius: 12px">612 travellers watching</span>
+</div>
+</header>
+
+<div style="display: flex; flex-wrap: wrap; gap: 16px; align-items: flex-start; justify-content: space-between">
+<section style="flex: 0 1 440px; min-width: 0; border-radius: 24px; background: rgba(250,250,252,0.76); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%); border: 0.5px solid rgba(255,255,255,0.85); box-shadow: 0 8px 30px rgba(0,0,0,0.1); padding: 18px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; justify-content: space-between; align-items: baseline"><h2 style="margin: 0; font-size: 20px; font-weight: 700">Priority queue</h2><span style="font-size: 13px; color: #48484A">Ranked by impact</span></div>
+<div style="border-radius: 16px; background: rgba(255,255,255,0.86); padding: 14px; display: flex; gap: 12px; align-items: flex-start"><span style="font-size: 15px; font-weight: 700; width: 18px">1</span><span style="flex: 1; display: flex; flex-direction: column; gap: 4px"><span style="display: flex; justify-content: space-between; gap: 8px"><span style="font-size: 15px; font-weight: 700">Aut slide · NH-3 km 212</span><span style="font-size: 12px; font-weight: 700; color: #8A4300; background: rgba(255,159,10,0.2); padding: 3px 8px; border-radius: 999px">One lane</span></span><span style="font-size: 13px; color: #48484A">~1,200 vehicles/day · ~400 m³ · 6–8 h · Crew A (2 JCB)</span></span></div>
+<div style="border-radius: 16px; background: rgba(255,255,255,0.86); padding: 14px; display: flex; gap: 12px; align-items: flex-start"><span style="font-size: 15px; font-weight: 700; width: 18px">2</span><span style="flex: 1; display: flex; flex-direction: column; gap: 4px"><span style="display: flex; justify-content: space-between; gap: 8px"><span style="font-size: 15px; font-weight: 700">Kataula road debris</span><span style="font-size: 12px; font-weight: 700; color: #A1251C; background: rgba(255,59,48,0.14); padding: 3px 8px; border-radius: 999px">Closed</span></span><span style="font-size: 13px; color: #48484A">~420 vehicles/day · no detour · 3–4 h · unassigned</span></span></div>
+<div style="border-radius: 16px; background: rgba(255,255,255,0.86); padding: 14px; display: flex; gap: 12px; align-items: flex-start"><span style="font-size: 15px; font-weight: 700; width: 18px">3</span><span style="flex: 1; display: flex; flex-direction: column; gap: 4px"><span style="display: flex; justify-content: space-between; gap: 8px"><span style="font-size: 15px; font-weight: 700">Pandoh sinking patch</span><span style="font-size: 12px; font-weight: 700; color: #8A4300; background: rgba(255,159,10,0.2); padding: 3px 8px; border-radius: 999px">Slow</span></span><span style="font-size: 13px; color: #48484A">~900 vehicles/day · 1 day · unassigned</span></span></div>
+<div style="border-radius: 16px; background: rgba(255,255,255,0.86); padding: 14px; display: flex; gap: 12px; align-items: flex-start"><span style="font-size: 15px; font-weight: 700; width: 18px">4</span><span style="flex: 1; display: flex; flex-direction: column; gap: 4px"><span style="display: flex; justify-content: space-between; gap: 8px"><span style="font-size: 15px; font-weight: 700">Shoulder washout · SH-32</span><span style="font-size: 12px; font-weight: 700; color: #1A6B35; background: rgba(52,199,89,0.16); padding: 3px 8px; border-radius: 999px">Open</span></span><span style="font-size: 13px; color: #48484A">~150 vehicles/day · 2 h · unassigned</span></span></div>
+</section>
+
+<aside style="flex: 0 1 380px; display: flex; flex-direction: column; gap: 16px">
+<section style="border-radius: 24px; background: rgba(250,250,252,0.76); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%); border: 0.5px solid rgba(255,255,255,0.85); box-shadow: 0 8px 30px rgba(0,0,0,0.1); padding: 18px; display: flex; flex-direction: column; gap: 12px">
+<span style="font-size: 12px; font-weight: 700; color: #48484A; letter-spacing: 0.5px">SUGGESTED DISPATCH PLAN</span>
+<ol style="margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; font-size: 15px; line-height: 1.4">
+<li>Keep <strong>Crew A</strong> at Aut until fully open (~2 PM).</li>
+<li>Send <strong>Crew B</strong> to Kataula now. It's fully closed with no detour.</li>
+<li><strong>Crew C</strong> to Pandoh after the rain stops (~4 PM).</li>
+</ol>
+<span style="font-size: 14px; color: #48484A">Saves about 2,400 vehicle-hours vs. the current order.</span>
+<button type="button" style="height: 46px; border: none; border-radius: 13px; background: #0071E3; color: #FFFFFF; font: inherit; font-size: 16px; font-weight: 600">Approve plan</button>
+</section>
+<section style="border-radius: 24px; background: rgba(250,250,252,0.76); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%); border: 0.5px solid rgba(255,255,255,0.85); box-shadow: 0 8px 30px rgba(0,0,0,0.1); padding: 18px; display: flex; flex-direction: column; gap: 10px">
+<span style="font-size: 12px; font-weight: 700; color: #48484A; letter-spacing: 0.5px">PUBLIC ADVISORY · DRAFT</span>
+<p style="margin: 0; font-size: 15px; line-height: 1.45">NH-3 near Aut: one lane open, full reopening expected by 2 PM. Buses please wait at Mandi.</p>
+<p lang="hi" style="margin: 0; font-size: 15px; line-height: 1.45; color: #3A3A3C">NH-3 औट के पास: एक लेन खुली है, दोपहर 2 बजे तक पूरी तरह खुलने की उम्मीद।</p>
+<button type="button" style="height: 44px; border: none; border-radius: 13px; background: rgba(118,118,128,0.14); color: #1D1D1F; font: inherit; font-size: 15px; font-weight: 600">Publish to travellers</button>
+</section>
+</aside>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1280,"height":900}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>

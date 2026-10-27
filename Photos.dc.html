@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Photos from Aut</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#FFFFFF}a:hover{color:#E5E5EA}
+</style>
+</helmet>
+<div style="position: relative; width: 390px; height: 844px; overflow: hidden; background: #000000; color: #FFFFFF; font-family: -apple-system, BlinkMacSystemFont, Inter, system-ui, sans-serif">
+
+<svg width="390" height="844" viewBox="0 0 390 844" aria-hidden="true" style="position: absolute; left: 0; top: 0"><rect width="390" height="844" fill="#7F8990"></rect><path d="M0 330 L130 170 L240 260 L390 140 V844 H0 Z" fill="#5F6B62"></path><path d="M20 844 L170 420 H250 L390 844 Z" fill="#474C50"></path><path d="M150 540 C182 478 252 468 284 512 L330 600 C262 616 200 612 140 588 Z" fill="#6E5D49"></path><rect x="72" y="560" width="52" height="34" rx="5" fill="#C9A227"></rect></svg>
+
+<sc-if value="{{ showAi }}" hint-placeholder-val="{{ true }}">
+<svg width="390" height="844" viewBox="0 0 390 844" aria-hidden="true" style="position: absolute; left: 0; top: 0"><path d="M150 540 C182 478 252 468 284 512 L330 600 C262 616 200 612 140 588 Z" fill="rgba(255,149,0,0.42)" stroke="#FF9F43" stroke-width="2.5"></path><rect x="68" y="556" width="60" height="42" rx="6" fill="none" stroke="#5AD39C" stroke-width="2.5"></rect><path d="M60 650 L140 650 M60 642 V658 M140 642 V658" stroke="#FFFFFF" stroke-width="2.5"></path></svg>
+<span style="position: absolute; left: 196px; top: 444px; font-size: 12px; font-weight: 700; color: #1D1D1F; background: #FF9F43; padding: 4px 8px; border-radius: 6px">Debris · ~35 m long</span>
+<span style="position: absolute; left: 72px; top: 528px; font-size: 12px; font-weight: 700; color: #1D1D1F; background: #5AD39C; padding: 4px 8px; border-radius: 6px">JCB</span>
+<span style="position: absolute; left: 52px; top: 664px; font-size: 12px; font-weight: 700; color: #1D1D1F; background: #FFFFFF; padding: 4px 8px; border-radius: 6px">Road left ~2.8 m</span>
+<div style="position: absolute; left: 14px; right: 14px; top: 112px; border-radius: 18px; background: rgba(30,30,30,0.45); backdrop-filter: blur(24px) saturate(160%); -webkit-backdrop-filter: blur(24px) saturate(160%); border: 0.5px solid rgba(255,255,255,0.18); padding: 12px 14px; display: flex; justify-content: space-between; align-items: center; gap: 8px">
+<span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 15px; font-weight: 700">Aut · NH-3 km 212</span><span style="font-size: 12px; color: #E5E5EA">12:15 PM · PWD crew · Verified 86%</span></span>
+<span style="font-size: 12px; font-weight: 700; color: #1D1D1F; background: #FFB766; padding: 5px 9px; border-radius: 999px; white-space: nowrap">One lane open</span>
+</div>
+<div style="position: absolute; left: 14px; right: 14px; top: 702px; display: flex; justify-content: space-between; font-size: 12px; font-weight: 600; text-shadow: 0 1px 3px rgba(0,0,0,0.6)"><span>~60% blocked · clears ~1–2 PM</span><span>Bikes ✓ Cars ✓ Buses ✕</span></div>
+</sc-if>
+
+<div style="position: absolute; left: 14px; right: 14px; top: 54px; display: flex; justify-content: space-between; align-items: center">
+<a href="Disruption.dc.html" aria-label="Back" style="width: 44px; height: 44px; border-radius: 50%; background: rgba(30,30,30,0.45); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" aria-hidden="true"><path d="M15 5l-7 7 7 7"></path></svg></a>
+<span style="height: 36px; padding: 0 14px; border-radius: 18px; background: rgba(30,30,30,0.45); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); display: flex; align-items: center; font-size: 14px; font-weight: 600">1 of 9</span>
+<button type="button" aria-label="Share annotated photo" style="width: 44px; height: 44px; border-radius: 50%; border: none; background: rgba(30,30,30,0.45); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); color: #FFFFFF; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" aria-hidden="true"><path d="M12 3v13M7 8l5-5 5 5"></path><path d="M5 13v7h14v-7"></path></svg></button>
+</div>
+
+<div style="position: absolute; left: 14px; right: 14px; bottom: 26px; border-radius: 26px; background: rgba(30,30,30,0.5); backdrop-filter: blur(28px) saturate(160%); -webkit-backdrop-filter: blur(28px) saturate(160%); border: 0.5px solid rgba(255,255,255,0.18); padding: 12px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; gap: 4px; padding: 3px; border-radius: 14px; background: rgba(255,255,255,0.12)">
+<button type="button" onClick="{{ pickAi }}" aria-pressed="{{ showAi }}" style="flex: 1; height: 32px; border: none; border-radius: 11px; background: {{ aiBg }}; color: {{ aiFg }}; font: inherit; font-size: 14px; font-weight: 600">AI-annotated</button>
+<button type="button" onClick="{{ pickOriginal }}" aria-pressed="{{ showOriginal }}" style="flex: 1; height: 32px; border: none; border-radius: 11px; background: {{ origBg }}; color: {{ origFg }}; font: inherit; font-size: 14px; font-weight: 600">Original</button>
+</div>
+<div style="display: flex; gap: 6px">
+<span style="flex: 1; height: 52px; border-radius: 10px; background: #7F8990; outline: 2.5px solid #FFFFFF; outline-offset: -2.5px"></span>
+<span style="flex: 1; height: 52px; border-radius: 10px; background: #6C767C"></span>
+<span style="flex: 1; height: 52px; border-radius: 10px; background: #959DA2"></span>
+<span style="flex: 1; height: 52px; border-radius: 10px; background: #5F686E"></span>
+<span style="flex: 1; height: 52px; border-radius: 10px; background: #8A9398; display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700">+5</span>
+</div>
+<span style="font-size: 12px; color: #D1D1D6; text-align: center">AI adds labels only, the photo is never altered. Faces and plates blurred.</span>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() {
+const on = this.state.showAi !== false;
+return {
+showAi: on,
+showOriginal: !on,
+aiBg: on ? 'rgba(255,255,255,0.92)' : 'transparent',
+aiFg: on ? '#1D1D1F' : '#FFFFFF',
+origBg: on ? 'transparent' : 'rgba(255,255,255,0.92)',
+origFg: on ? '#FFFFFF' : '#1D1D1F',
+pickAi: () => this.setState({ showAi: true }),
+pickOriginal: () => this.setState({ showAi: false })
+};
+}
+}
+</script>
+</body>
+</html>

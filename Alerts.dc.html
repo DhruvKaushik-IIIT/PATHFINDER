@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Alerts</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#0066CC}a:hover{color:#004E9E}
+</style>
+</helmet>
+<div style="position: relative; width: 390px; height: 844px; overflow: hidden; color: #1D1D1F; font-family: -apple-system, BlinkMacSystemFont, Inter, system-ui, sans-serif">
+<div style="position: absolute; inset: 0"><dc-import name="Map" hint-size="390px,844px"></dc-import></div>
+
+<div style="position: absolute; left: 0; right: 0; bottom: 0; top: 150px; border-radius: 30px 30px 0 0; background: rgba(250,250,252,0.8); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%); border-top: 0.5px solid rgba(255,255,255,0.8); box-shadow: 0 -10px 34px rgba(0,0,0,0.16); padding: 8px 18px 24px; display: flex; flex-direction: column; gap: 14px">
+<span style="align-self: center; width: 38px; height: 5px; border-radius: 3px; background: rgba(60,60,67,0.3)"></span>
+<div style="display: flex; justify-content: space-between; align-items: center">
+<h1 style="margin: 0; font-size: 28px; font-weight: 700; letter-spacing: -0.4px">Alerts</h1>
+<a href="Main.dc.html" aria-label="Close" style="width: 32px; height: 32px; border-radius: 50%; background: rgba(118,118,128,0.16); display: flex; align-items: center; justify-content: center; color: #3C3C43"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg></a>
+</div>
+
+<div style="border-radius: 18px; background: rgba(255,255,255,0.86); padding: 16px; display: flex; flex-direction: column; gap: 10px">
+<span style="display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; color: #48484A; letter-spacing: 0.4px"><span style="width: 8px; height: 8px; border-radius: 50%; background: #C25E00"></span>ROAD WATCH · 5 MIN AGO</span>
+<span style="font-size: 18px; font-weight: 700; line-height: 1.25">Your Mandi → Manali trip changed</span>
+<span style="font-size: 15px; line-height: 1.45; color: #3A3A3C">Aut is now one lane open. Leaving at 11 AM instead of 5 AM saves about 2 hours of waiting.</span>
+<a href="Route.dc.html" style="height: 44px; border-radius: 12px; background: #0071E3; color: #FFFFFF; font-size: 16px; font-weight: 600; display: flex; align-items: center; justify-content: center; text-decoration: none">See new plan</a>
+</div>
+
+<div style="border-radius: 18px; background: rgba(255,255,255,0.86); padding: 16px; display: flex; flex-direction: column; gap: 10px">
+<span style="display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 700; color: #48484A; letter-spacing: 0.4px"><span style="width: 8px; height: 8px; border-radius: 50%; background: #0A84FF"></span>SCOUT REQUEST · 20 MIN AGO</span>
+<span style="font-size: 18px; font-weight: 700; line-height: 1.25">Can you help travellers?</span>
+<span style="font-size: 15px; line-height: 1.45; color: #3A3A3C">12 people are crossing Jalori Pass tomorrow with no fresh info. You're 3 km away. Share a quick photo, only when safely stopped.</span>
+<div style="display: flex; gap: 8px">
+<a href="Report.dc.html" style="flex: 1; height: 44px; border-radius: 12px; background: rgba(0,113,227,0.12); color: #0058B0; font-size: 16px; font-weight: 600; display: flex; align-items: center; justify-content: center; text-decoration: none">Share photo</a>
+<button type="button" style="flex: 1; height: 44px; border: none; border-radius: 12px; background: rgba(118,118,128,0.14); color: #1D1D1F; font: inherit; font-size: 16px; font-weight: 500">Not now</button>
+</div>
+</div>
+
+<div style="border-radius: 16px; background: rgba(255,255,255,0.86)">
+<div style="display: flex; gap: 12px; align-items: center; padding: 13px 14px; border-bottom: 0.5px solid rgba(60,60,67,0.18)"><span style="width: 8px; height: 8px; border-radius: 50%; background: #1E7B45; flex-shrink: 0"></span><span style="flex: 1; font-size: 15px">Atal Tunnel reopened for cars</span><span style="font-size: 13px; color: #48484A">Yesterday</span></div>
+<div style="display: flex; gap: 12px; align-items: center; padding: 13px 14px"><span style="width: 8px; height: 8px; border-radius: 50%; background: #8E8E93; flex-shrink: 0"></span><span style="flex: 1; font-size: 15px">Heavy rain risk, km 205–215</span><span style="font-size: 13px; color: #48484A">Sat</span></div>
+</div>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+renderVals() {
+return {};
+}
+}
+</script>
+</body>
+</html>
