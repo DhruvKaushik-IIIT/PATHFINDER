@@ -1,6 +1,8 @@
 {
   "crons": [
     { "path": "/api/cron/ingest-news", "schedule": "30 1 * * *" },
-    { "path": "/api/cron/road-watch", "schedule": "0 13 * * *" }
+    { "path": "/api/cron/road-watch", "schedule": "0 13 * * *" },
+    { "path": "/api/cron/reverify", "schedule": "30 7 * * *" },
+    { "path": "/api/cron/scout-gaps", "schedule": "0 10 * * *" }
   ]
 }

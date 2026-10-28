@@ -3,6 +3,7 @@
 // the official entered (progress.ts) → photo + official_updates row + event status/ETA/timeline →
 // Road Watch for travellers on that road. Mismatches are flagged on the timeline, not hidden.
 import { transcribe } from "../ai/router.ts";
+import { debrisVolumeM3 } from "../clearing/estimate.ts";
 import { insert, publicUrl, select, update, upload } from "../db/supabase.ts";
 import { eventTitle, type EventStatus } from "../events/types.ts";
 import { clock } from "../geo/format.ts";
@@ -191,7 +192,10 @@ export async function postFieldUpdate(official: Official, input: FieldInput): Pr
     status: newStatus,
     passable,
     eta_clear: eta ? { earliest: new Date(Math.max(now.getTime(), eta.getTime() - 90 * 60_000)).toISOString(), latest: eta.toISOString() } : null,
-    measurements: { ...(ev.measurements ?? {}), ...measured },
+    measurements: (() => {
+      const merged = { ...(ev.measurements ?? {}), ...measured };
+      return { ...merged, debrisVolumeM3: debrisVolumeM3(ev.type, merged) };
+    })(),
     summary: `${title}: ${stateEn}${resolved ? "" : `, ${input.pctCleared}% cleared`}${etaText ? `, ${etaText}` : ""} (${official.org} update).`,
     summary_hi: `${title}: ${stateHi}${resolved ? "" : `, ${input.pctCleared}% साफ़`}${eta ? `, ~${clock(eta.toISOString())} तक पूरी तरह खुलने की उम्मीद` : ""} (${official.org})।`,
     confidence: check.level === "ok" ? Math.max(ev.confidence, 0.9) : ev.confidence,

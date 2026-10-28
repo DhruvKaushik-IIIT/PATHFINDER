@@ -55,6 +55,10 @@ export interface Alert {
     advisory?: boolean;
     hi?: string;
     eventId?: string;
+    /** Scout request (Phase 5): answer with a photo at /report?scout=<requestId>. */
+    requestId?: string;
+    question?: string;
+    km?: number;
   } | null;
   read: boolean;
   createdAt: string;

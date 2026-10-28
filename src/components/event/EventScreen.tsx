@@ -2,15 +2,16 @@
 
 // Frame 05 Disruption detail (docs/design/glass-html/Disruption.dc.html): tall sheet over the map.
 // Big numbers first (stat tiles), evidence below (photo, sources, timeline). Every number is "~".
-import { Check, CircleHelp, Clock, Image as ImageIcon, Newspaper, ShieldCheck, X } from "lucide-react";
+import { Check, CircleHelp, Clock, Image as ImageIcon, Newspaper, ScanSearch, Share2, ShieldCheck, TrendingUp, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { approxRange, clearWindow } from "@/lib/events/format";
-import { ago, STATUS_STYLE, type EventDetail } from "@/lib/events/types";
+import { ago, STATUS_STYLE, type EventDetail, type InvestigationSummary } from "@/lib/events/types";
 import { eventTitle } from "@/components/route/routeData";
 import CrewCard from "@/components/repairs/CrewCard";
+import ModelChecks from "@/components/verification/ModelChecks";
 import type { Repair } from "@/lib/repairs/types";
 
 const MapView = dynamic(() => import("@/components/map/MapView"), {
@@ -131,9 +132,13 @@ export default function EventScreen({ id }: { id: string }) {
                 value={m.roadWidthLeftM && m.roadWidthLeftM.max < 0.5 ? "None" : approxRange(m.roadWidthLeftM, "m")}
                 suffix={total && m.roadWidthLeftM ? `of ~${Math.round(total)}` : undefined}
               />
-              <Tile label="Clears around" value={clearWindow(ev.etaClear) ?? "Unknown"} />
-              {/* TODO(phase-5): debris volume → clearing-time estimate */}
-              <Tile label="Last confirmed" value={ago(ev.lastConfirmedAt)} />
+              {/* Reported/official window first; else the predictor's estimate (marked "est."). */}
+              <Tile
+                label="Clears around"
+                value={clearWindow(ev.etaClear) ?? clearWindow(ev.reopening?.fullyOpen ?? null) ?? "Unknown"}
+                suffix={!ev.etaClear && ev.reopening?.fullyOpen ? "est." : undefined}
+              />
+              {m.debrisVolumeM3 ? <Tile label="Debris" value={approxRange(m.debrisVolumeM3, "m³")} /> : <Tile label="Last confirmed" value={ago(ev.lastConfirmedAt)} />}
             </div>
 
             {/* passability: word + colour */}
@@ -176,7 +181,7 @@ export default function EventScreen({ id }: { id: string }) {
               </div>
             )}
 
-            {/* TODO(phase-5): reopening predictor line */}
+            {ev.reopening && ev.reopening.method !== "none" && <Predictor r={ev.reopening} />}
             {repair && <CrewCard r={repair} link={false} />}
 
             <div className="glass-card flex items-start gap-[10px] px-[14px] py-3">
@@ -185,17 +190,28 @@ export default function EventScreen({ id }: { id: string }) {
               ) : (
                 <ShieldCheck size={20} className="mt-px shrink-0 text-open" aria-hidden />
               )}
-              <span className="flex flex-col gap-0.5">
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="text-[15px] font-semibold">
                   {newsOnly ? "From news reports · not yet confirmed" : "Verified"} · {Math.round(ev.confidence * 100)}% confidence
                 </span>
                 {sourceText && <span className="text-[12px] text-ink-2">{sourceText}</span>}
+                {ev.verification?.latest && <ModelChecks v={ev.verification} />}
               </span>
             </div>
 
-            {ev.timeline.length > 0 && (
+            {(ev.investigation || ev.checkReason) && (
+              <AiCheck
+                eventId={ev.id}
+                note={ev.investigation}
+                reason={ev.checkReason}
+                onDone={(n) => setEv((e) => (e ? { ...e, investigation: n, confidence: n.confidenceAfter } : e))}
+              />
+            )}
+
+            {/* AI checks have their own card above. */}
+            {ev.timeline.some((i) => i.kind !== "ai") && (
               <div className="glass-card flex flex-col px-[14px] py-1">
-                {ev.timeline.slice(0, 4).map((item, i, arr) => (
+                {ev.timeline.filter((i) => i.kind !== "ai").slice(0, 4).map((item, i, arr) => (
                   <div key={`${item.at}-${i}`} className={`flex gap-[10px] py-[10px] ${i < arr.length - 1 ? "border-b-[0.5px] border-[rgba(60,60,67,0.18)]" : ""}`}>
                     <Clock size={14} className="mt-[3px] shrink-0 text-ink-3" aria-hidden />
                     <span className="flex min-w-0 flex-col gap-px">
@@ -209,7 +225,12 @@ export default function EventScreen({ id }: { id: string }) {
               </div>
             )}
 
-            {/* TODO(phase-5): Share alert card (Muse Image) */}
+            <Link
+              href={`/share/${ev.id}`}
+              className="flex min-h-[48px] shrink-0 items-center justify-center gap-2 rounded-[14px] bg-accent text-[16px] font-semibold text-white no-underline"
+            >
+              <Share2 size={18} aria-hidden /> Share alert card
+            </Link>
             <p className="mt-auto text-center text-[12px] text-ink-2">Estimates from photos and reports · verify with official sources</p>
           </>
         )}
@@ -226,6 +247,109 @@ function Tile({ label, value, suffix }: { label: string; value: string | null; s
         {value ?? "Unknown"}
         {suffix && <span className="ml-1 text-[13px] font-medium text-ink-2">{suffix}</span>}
       </span>
+    </div>
+  );
+}
+
+/** Reopening predictor (plain code): from the photo trend, else debris volume ÷ machine rate. */
+function Predictor({ r }: { r: NonNullable<EventDetail["reopening"]> }) {
+  const one = clearWindow(r.oneLane);
+  const full = clearWindow(r.fullyOpen);
+  const line = [one && `one lane ~${one}`, full && `fully open ~${full}`].filter(Boolean).join(" · ");
+  return (
+    <div className="glass-card flex items-start gap-[10px] px-[14px] py-3">
+      <TrendingUp size={20} className={`mt-px shrink-0 ${r.stalled ? "text-slow" : "text-accent"}`} aria-hidden />
+      <span className="flex min-w-0 flex-col gap-0.5">
+        <span className="text-[15px] font-semibold">
+          {line ? `Reopening predictor: ${line}` : r.stalled ? "Reopening predictor: no progress visible yet" : "Reopening predictor: waiting for a crew"}
+        </span>
+        <span className="text-[12px] text-ink-2">
+          {r.method === "photo_trend" ? "From the photo sequence" : "From debris volume"} · {r.basis} · estimate
+        </span>
+      </span>
+    </div>
+  );
+}
+
+const FINDING: Record<InvestigationSummary["finding"], { word: string; tone: "ok" | "warn" | "muted" }> = {
+  still_there: { word: "Still there", tone: "ok" },
+  likely_changed: { word: "May have changed", tone: "warn" },
+  likely_cleared: { word: "May have cleared", tone: "warn" },
+  conflicting: { word: "Sources disagree", tone: "warn" },
+  no_new_evidence: { word: "No new evidence", tone: "muted" },
+  unavailable: { word: "Unavailable", tone: "muted" },
+};
+const BY: Record<string, string> = { baseten: "Muse Spark Open", meta: "Muse Spark", code: "rules", mock: "mock" };
+
+/** Investigator (Phase 5): last AI check of a doubtful event + "Check again". */
+function AiCheck({ eventId, note, reason, onDone }: { eventId: string; note: InvestigationSummary | null; reason: string | null; onDone: (n: InvestigationSummary) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const run = async () => {
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await fetch(`/api/events/${eventId}/investigate`, { method: "POST" });
+      const b = (await r.json()) as { data?: { note: InvestigationSummary | null; ran: boolean; skipped?: string } | null; degraded?: string };
+      if (b.data?.note) onDone(b.data.note);
+      if (b.data && !b.data.ran && b.data.skipped) setMsg(`Not re-checked: ${b.data.skipped}.`);
+      else if (!b.data?.note) setMsg(b.degraded ?? "AI check unavailable right now.");
+    } catch {
+      setMsg("AI check unavailable right now.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const f = note ? FINDING[note.finding] : null;
+  return (
+    <div className="glass-card flex flex-col gap-2 px-[14px] py-3">
+      <div className="flex items-start gap-[10px]">
+        <ScanSearch size={20} className={`mt-px shrink-0 ${f?.tone === "warn" ? "text-slow" : f?.tone === "ok" ? "text-open" : "text-ink-3"}`} aria-hidden />
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="text-[15px] font-semibold">
+            {note && f ? `AI check: ${f.word}` : "Needs a fresh look"}
+            {note && <span className="font-normal text-ink-2"> · {ago(note.at)}</span>}
+          </span>
+          {note ? (
+            <>
+              <span className="text-[14px]">{note.explanation}</span>
+              {note.explanationHi && (
+                <span lang="hi" className="text-[13px] text-ink-2">
+                  {note.explanationHi}
+                </span>
+              )}
+              {note.evidence.length > 0 && (
+                <details className="text-[12px] text-ink-2">
+                  <summary className="cursor-pointer py-1 font-semibold text-link">Evidence ({note.evidence.length})</summary>
+                  <ul className="m-0 flex list-disc flex-col gap-0.5 pl-4">
+                    {note.evidence.map((e) => (
+                      <li key={e}>{e}</li>
+                    ))}
+                  </ul>
+                </details>
+              )}
+              <span className="text-[12px] text-ink-2">
+                Investigator agent · {BY[note.by] ?? note.by}
+                {note.scoutRequested ? " · asked nearby scouts for a fresh photo" : ""} · it never changes the status itself
+              </span>
+            </>
+          ) : (
+            <span className="text-[13px] text-ink-2">{reason ? `${reason[0]!.toUpperCase()}${reason.slice(1)}.` : null}</span>
+          )}
+        </span>
+      </div>
+      {reason && (
+        <button
+          type="button"
+          onClick={run}
+          disabled={busy}
+          aria-busy={busy}
+          className="flex min-h-[44px] items-center justify-center rounded-[14px] bg-accent-tint px-4 text-[15px] font-semibold text-accent-tint-ink disabled:opacity-60"
+        >
+          {busy ? "Checking reports, updates and news…" : note ? "Check again" : "Check with AI"}
+        </button>
+      )}
+      {msg && <span className="text-[12px] text-ink-2" role="status">{msg}</span>}
     </div>
   );
 }

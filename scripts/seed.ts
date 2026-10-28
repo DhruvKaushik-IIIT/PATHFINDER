@@ -168,7 +168,7 @@ const fromNow = (h: number) => new Date(Date.now() + h * 3_600_000).toISOString(
 
 if (process.argv.includes("--wipe")) {
   // Children first; events cascade to their timeline.
-  for (const t of ["alerts", "watched_trips", "news_items", "official_updates", "crews", "claims", "photos", "reports", "event_timeline", "events", "users"]) {
+  for (const t of ["alerts", "scout_requests", "watched_trips", "news_items", "official_updates", "crews", "claims", "photos", "reports", "event_timeline", "events", "users"]) {
     await req("DELETE", `${t}?is_demo=eq.true`);
     console.log(`wiped demo rows from ${t}`);
   }
@@ -248,3 +248,15 @@ const crews = [
 ].map((c) => ({ ...c, is_demo: true }));
 await req("POST", "crews?on_conflict=id", crews, "resolution=merge-duplicates,return=minimal");
 console.log(`seeded ${crews.length} demo crews`);
+
+// ---------------------------------------------------------------- demo scouts (Mandi leaderboard on /me)
+
+const scoutId = (n: number) => `00000000-0000-4000-a000-${String(n).padStart(12, "0")}`;
+const scouts = [
+  { id: scoutId(1), display_name: "Rakesh T.", points: 1240 },
+  { id: scoutId(2), display_name: "Neha S.", points: 980 },
+  { id: scoutId(3), display_name: "Arjun K.", points: 865 },
+  { id: scoutId(4), display_name: "Pooja R.", points: 410 },
+].map((u) => ({ ...u, role: "public", district: "Mandi", is_demo: true }));
+await req("POST", "users?on_conflict=id", scouts, "resolution=merge-duplicates,return=minimal");
+console.log(`seeded ${scouts.length} demo scouts (Mandi leaderboard)`);

@@ -12,6 +12,7 @@ import Sheet from "@/components/glass/Sheet";
 import EventPeek from "@/components/map/EventPeek";
 import type { LatLng } from "@/components/map/MapView";
 import { useEvents } from "@/components/map/useEvents";
+import { useLocationPing } from "@/components/me/useLocationPing";
 import { STATUS_STYLE, type MapEvent, type NearbyResult } from "@/lib/events/types";
 import type { Place } from "@/lib/geo/placeTypes";
 import { routeUrl, type WatchedTrip } from "@/lib/watch/types";
@@ -33,6 +34,15 @@ export default function HomeScreen() {
   const [picked, setPicked] = useState<Place | null>(null);
   const onSearchActive = useCallback((active: boolean) => setSearching(active), []);
   const near = useNearby(me);
+  // Scouts: coarse location every 5 min while the app is open, only if they chose "While using" on /me.
+  const [locationOn, setLocationOn] = useState(false);
+  useEffect(() => {
+    fetch("/api/me")
+      .then((r) => r.json() as Promise<{ data?: { settings: { locationMode: string } } | null }>)
+      .then((b) => setLocationOn(b.data?.settings.locationMode === "while_using"))
+      .catch(() => {});
+  }, []);
+  useLocationPing(locationOn);
   const { unread, watching } = useRoadWatch();
 
   function pick(p: Place) {
