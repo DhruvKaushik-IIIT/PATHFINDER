@@ -26,6 +26,7 @@ export default function EventPeek({ event, onClose }: { event: MapEvent; onClose
           <span>{ago(event.lastConfirmedAt)}</span>
           <span>· ~{Math.round(event.confidence * 100)}% sure</span>
           {event.modelsAgreed && event.modelsAgreed >= 2 ? <span>· 2 AI models agree</span> : null}
+          {!event.reports && event.news ? <span>· from news, not yet confirmed</span> : null}
         </div>
         {/* TODO(phase-2): link to /event/[id] detail */}
         <span className="text-[11px] text-ink-3">Verify with official sources</span>

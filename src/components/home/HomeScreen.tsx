@@ -4,7 +4,7 @@
 import { Bell, Camera, ChevronRight, Eye, Layers, MapPin, Navigation, Route, Target, User } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Marker, type MapRef } from "react-map-gl/maplibre";
 import PlaceCard from "@/components/home/PlaceCard";
 import PlaceSearch from "@/components/home/PlaceSearch";
@@ -12,7 +12,7 @@ import Sheet from "@/components/glass/Sheet";
 import EventPeek from "@/components/map/EventPeek";
 import type { LatLng } from "@/components/map/MapView";
 import { useEvents } from "@/components/map/useEvents";
-import type { MapEvent } from "@/lib/events/types";
+import { STATUS_STYLE, type MapEvent, type NearbyResult } from "@/lib/events/types";
 import type { Place } from "@/lib/geo/placeTypes";
 
 // MapLibre needs `window` → client-only.
@@ -31,6 +31,7 @@ export default function HomeScreen() {
   const [searching, setSearching] = useState(false);
   const [picked, setPicked] = useState<Place | null>(null);
   const onSearchActive = useCallback((active: boolean) => setSearching(active), []);
+  const near = useNearby(me);
 
   function pick(p: Place) {
     setPicked(p);
@@ -133,12 +134,11 @@ export default function HomeScreen() {
             <Tile href="/report" label="Report" filled icon={<Camera size={26} strokeWidth={2} aria-hidden />} />
           </div>
 
-          {/* TODO(phase-3): real counts from /api/nearby */}
           <Row
-            href="/nearby"
-            lead={<span className="size-[10px] shrink-0 rounded-full bg-unknown" />}
-            title="Near you right now"
-            subtitle="No verified issues reported yet"
+            href={me ? `/nearby?lat=${me.latitude.toFixed(4)}&lng=${me.longitude.toFixed(4)}` : "/nearby"}
+            lead={<span className="size-[10px] shrink-0 rounded-full" style={{ background: near.dot }} />}
+            title={me ? "Near you right now" : "Around Mandi right now"}
+            subtitle={near.text}
           />
           {/* TODO(phase-3): watched trips */}
           <Row
@@ -153,6 +153,30 @@ export default function HomeScreen() {
       </Sheet>
     </main>
   );
+}
+
+/** Counts for the "Near you right now" row: /api/nearby without the AI summary (free). */
+function useNearby(me: LatLng | null): { text: string; dot: string } {
+  const [res, setRes] = useState<NearbyResult | null>(null);
+  const lat = me?.latitude.toFixed(2) ?? "31.71";
+  const lng = me?.longitude.toFixed(2) ?? "76.93";
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/nearby?lat=${lat}&lng=${lng}&radiusKm=25&summary=0`)
+      .then((r) => r.json() as Promise<{ data: NearbyResult | null }>)
+      .then((b) => alive && setRes(b.data))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [lat, lng]);
+  if (!res) return { text: "Checking roads within 25 km…", dot: STATUS_STYLE.unknown.dot };
+  const c = res.counts;
+  const parts = [c.closed && `${c.closed} closed`, c.oneLane && `${c.oneLane} one lane`, c.slow && `${c.slow} slow`].filter(Boolean);
+  if (!parts.length) return { text: "No verified issues within 25 km", dot: STATUS_STYLE.open.dot };
+  const top = res.items[0];
+  const where = top?.placeName ? ` · ${STATUS_STYLE[top.status].word.toLowerCase()} near ${top.placeName}` : "";
+  return { text: `${parts.join(" · ")} within 25 km${where}`, dot: STATUS_STYLE[c.closed ? "closed" : "slow"].dot };
 }
 
 function Tile({ href, label, icon, filled = false }: { href: string; label: string; icon: React.ReactNode; filled?: boolean }) {

@@ -58,6 +58,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       startedAt: r.started_at,
       resolvedAt: r.resolved_at,
       reports: sources.reports,
+      news: sources.news,
       modelsAgreed: r.models_agreed,
       photoUrl: r.photos.find((p) => p.annotated_url)?.annotated_url ?? r.photos[0]?.public_url ?? null,
       passable: r.passable ?? { bike: null, car: null, bus: null },

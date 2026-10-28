@@ -2,7 +2,7 @@
 
 // Frame 05 Disruption detail (docs/design/glass-html/Disruption.dc.html): tall sheet over the map.
 // Big numbers first (stat tiles), evidence below (photo, sources, timeline). Every number is "~".
-import { Check, CircleHelp, Clock, Image as ImageIcon, ShieldCheck, X } from "lucide-react";
+import { Check, CircleHelp, Clock, Image as ImageIcon, Newspaper, ShieldCheck, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -45,6 +45,7 @@ export default function EventScreen({ id }: { id: string }) {
   const total = typeof m.roadTotalWidthM === "number" ? m.roadTotalWidthM : m.roadTotalWidthM ? (m.roadTotalWidthM.min + m.roadTotalWidthM.max) / 2 : null;
   const photo = ev?.photos.find((p) => p.annotatedUrl) ?? ev?.photos[0];
   const src = ev?.sources;
+  const newsOnly = Boolean(src && !src.reports && !src.official && src.news);
   const sourceText = src
     ? [
         src.reports && `${src.reports} report${src.reports > 1 ? "s" : ""}`,
@@ -169,9 +170,15 @@ export default function EventScreen({ id }: { id: string }) {
             {/* TODO(phase-5): reopening predictor line · TODO(phase-4): crew progress card (/route/repairs) */}
 
             <div className="glass-card flex items-start gap-[10px] px-[14px] py-3">
-              <ShieldCheck size={20} className="mt-px shrink-0 text-open" aria-hidden />
+              {newsOnly ? (
+                <Newspaper size={20} className="mt-px shrink-0 text-slow" aria-hidden />
+              ) : (
+                <ShieldCheck size={20} className="mt-px shrink-0 text-open" aria-hidden />
+              )}
               <span className="flex flex-col gap-0.5">
-                <span className="text-[15px] font-semibold">Verified · {Math.round(ev.confidence * 100)}% confidence</span>
+                <span className="text-[15px] font-semibold">
+                  {newsOnly ? "From news reports · not yet confirmed" : "Verified"} · {Math.round(ev.confidence * 100)}% confidence
+                </span>
                 {sourceText && <span className="text-[12px] text-ink-2">{sourceText}</span>}
               </span>
             </div>
