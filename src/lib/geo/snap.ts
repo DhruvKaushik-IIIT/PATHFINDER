@@ -42,8 +42,7 @@ interface PlaceRow {
 }
 
 /** Nearest named place within ~6 km; towns win over villages unless the village is much closer. */
-async function nearestPlace(lat: number, lng: number): Promise<string | null> {
-  const d = 0.06;
+export async function nearestPlace(lat: number, lng: number, d = 0.06): Promise<string | null> {
   const rows = await select<PlaceRow>(
     "places",
     `select=name,kind,lat,lng&kind=in.(town,village,pass,tunnel)` +
