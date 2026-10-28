@@ -14,6 +14,7 @@ import Toast from "@/components/glass/Toast";
 import { STATUS_STYLE } from "@/lib/events/types";
 import { clock, duration, VERDICT_STYLE } from "@/lib/geo/format";
 import type { RoutePlan } from "@/lib/geo/routeTypes";
+import type { WatchedTrip } from "@/lib/watch/types";
 import { checkedBy, departLabel, eventTitle, saveCheck, VERDICT_WORD, type CheckResult } from "./routeData";
 
 const MapView = dynamic(() => import("@/components/map/MapView"), {
@@ -31,6 +32,8 @@ export default function RouteScreen() {
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [showWhy, setShowWhy] = useState(false);
+  const [watchId, setWatchId] = useState<string | null>(null);
+  const [watchBusy, setWatchBusy] = useState(false);
 
   const from = params.get("from");
   const to = params.get("to");
@@ -97,6 +100,21 @@ export default function RouteScreen() {
   }, [plan]);
   useEffect(fit, [fit]);
 
+  // Road Watch: is this trip (same from/to names) already watched on this device?
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/watch")
+      .then((r) => r.json() as Promise<{ data: WatchedTrip[] }>)
+      .then((b) => {
+        const hit = (b.data ?? []).find((t) => t.from.name === (fromName || "Start") && t.to.name === (toName || "Destination"));
+        if (alive) setWatchId(hit?.id ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [fromName, toName]);
+
   if (!from || !to) {
     return (
       <main className="fixed inset-0 flex flex-col items-center justify-center gap-4 bg-land px-8 text-center">
@@ -106,6 +124,41 @@ export default function RouteScreen() {
         </Link>
       </main>
     );
+  }
+
+  async function toggleWatch() {
+    if (!from || !to) return;
+    setWatchBusy(true);
+    try {
+      if (watchId) {
+        const res = await fetch(`/api/watch/${watchId}`, { method: "DELETE" });
+        if (!res.ok) throw new Error();
+        setWatchId(null);
+        setToast("Stopped watching this trip");
+      } else {
+        const v = check?.verdict;
+        const res = await fetch("/api/watch", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            from,
+            to,
+            fromName: plan?.from.name ?? (fromName || "Start"),
+            toName: plan?.to.name ?? (toName || "Destination"),
+            departAt: depart ?? null,
+            verdict: v ? { verdict: v.verdict, headline: v.headline, headlineHi: v.headlineHi } : null,
+          }),
+        });
+        const body = (await res.json()) as { data?: WatchedTrip };
+        if (!res.ok || !body.data) throw new Error();
+        setWatchId(body.data.id);
+        setToast("Watching — Road Watch will alert you if a road on this trip changes");
+      }
+    } catch {
+      setToast("Couldn't update Road Watch — try again");
+    } finally {
+      setWatchBusy(false);
+    }
   }
 
   const best = plan?.routes[0];
@@ -278,16 +331,25 @@ export default function RouteScreen() {
 
             <button
               type="button"
-              onClick={() => setToast("Road Watch (re-plan + alerts) arrives in the next update")}
-              className="flex items-center gap-3 rounded-[14px] bg-white/80 px-[14px] py-3 text-left"
+              role="switch"
+              aria-checked={Boolean(watchId)}
+              disabled={watchBusy || !from || !to}
+              onClick={toggleWatch}
+              className="flex items-center gap-3 rounded-[14px] bg-white/80 px-[14px] py-3 text-left disabled:opacity-60"
             >
               <span className="flex flex-1 flex-col gap-px">
                 <span className="text-[15px] font-semibold">Watch this trip</span>
-                <span className="text-[13px] text-ink-2">Re-plan and alert me if anything changes</span>
+                <span className="text-[13px] text-ink-2">
+                  {watchId ? "Road Watch is on — you'll get an alert if anything changes" : "Re-plan and alert me if anything changes"}
+                </span>
               </span>
-              {/* TODO(phase-3): real switch wired to POST /api/watch */}
-              <span aria-hidden className="relative h-[31px] w-[51px] shrink-0 rounded-full bg-[rgba(120,120,128,0.16)]">
-                <span className="absolute left-[2px] top-[2px] size-[27px] rounded-full bg-white shadow" />
+              <span
+                aria-hidden
+                className={`relative h-[31px] w-[51px] shrink-0 rounded-full transition-colors ${watchId ? "bg-open" : "bg-[rgba(120,120,128,0.16)]"}`}
+              >
+                <span
+                  className={`absolute top-[2px] size-[27px] rounded-full bg-white shadow transition-[left] ${watchId ? "left-[22px]" : "left-[2px]"}`}
+                />
               </span>
             </button>
 

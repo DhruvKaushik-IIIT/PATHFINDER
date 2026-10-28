@@ -24,7 +24,8 @@
     "fetch-places": "node --env-file-if-exists=.env.local scripts/fetch-places.ts",
     "load-segments": "node --env-file-if-exists=.env.local scripts/load-segments.ts",
     "seed": "node --env-file-if-exists=.env.local scripts/seed.ts",
-    "ingest-news": "node --env-file-if-exists=.env.local scripts/ingest-news.ts"
+    "ingest-news": "node --env-file-if-exists=.env.local scripts/ingest-news.ts",
+    "test:road-watch": "node --env-file-if-exists=.env.local scripts/test-road-watch.ts"
   },
   "dependencies": {
     "@meta-sam/parser": "^0.1.0",

@@ -1,11 +1,12 @@
 // POST /api/reports (multipart: photo, lat, lng, text?, voice? as WAV) → claim + verified event.
 // The pipeline lives in src/lib/reports/submit.ts.
 // Contract (CLAUDE.md 5.7): AI trouble never errors → { ok: true, data, degraded? }.
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { hasDb } from "@/lib/db/supabase.ts";
 import { preparePhoto, processPhoto } from "@/lib/reports/processPhoto.ts";
 import { findDuplicate, submitReport } from "@/lib/reports/submit.ts";
+import { roadWatchAfterChange } from "@/lib/watch/roadWatch.ts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -76,6 +77,8 @@ export async function POST(req: Request) {
       voiceWav: voice instanceof File ? Buffer.from(await voice.arrayBuffer()) : null,
     });
     const { degraded, ...rest } = data;
+    // Road Watch is event-driven: re-check watched trips near this event once the response is sent.
+    if (data.eventAction === "created" || data.eventAction === "merged") after(() => roadWatchAfterChange([{ lat, lng }]));
     return NextResponse.json({ ok: true, data: rest, ...(degraded.length && { degraded: degraded.join("; ") }) });
   } catch (err) {
     // Database/storage trouble is a real server error (not an AI fallback case) — report it, don't crash.
