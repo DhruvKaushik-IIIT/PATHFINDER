@@ -4,7 +4,9 @@
 // breaker on auth/billing errors, fall back to the next provider, and never throw.
 import type OpenAI from "openai";
 import { APIConnectionError, APIConnectionTimeoutError, APIError } from "openai";
+import { insert, hasDb } from "../db/supabase.ts";
 import { client, hasKey, MODELS, type Provider } from "./clients.ts";
+import { segmentImage, type SamResult } from "./sam.ts";
 
 // ---------------------------------------------------------------- mode
 
@@ -160,8 +162,14 @@ interface CallLog {
 }
 
 function logCall(entry: CallLog): void {
-  // TODO(phase-1): insert into the ai_calls table once the full schema exists.
   console.info("[ai]", JSON.stringify(entry));
+  if (!hasDb()) return;
+  // Fire-and-forget: a logging failure must never break the job.
+  insert("ai_calls", {
+    at: entry.at, purpose: entry.purpose, provider: entry.provider, model: entry.model,
+    input_tokens: entry.inputTokens, output_tokens: entry.outputTokens, cost_usd: entry.costUsd,
+    latency_ms: entry.latencyMs, ok: entry.ok, fallback_used: entry.fallbackUsed, error_kind: entry.errorKind ?? null,
+  }).catch((err: unknown) => console.warn("[ai] ai_calls insert failed:", (err as Error).message));
 }
 
 // ---------------------------------------------------------------- job runner
@@ -170,7 +178,8 @@ export interface Attempt<T> {
   provider: Provider;
   model: string;
   kind?: "text" | "agent";
-  run: (c: OpenAI) => Promise<{ data: T; usage?: Usage }>;
+  /** costUsd overrides the token-based estimate (per-image pricing, e.g. SAM). */
+  run: (c: OpenAI) => Promise<{ data: T; usage?: Usage; costUsd?: number }>;
 }
 
 export interface JobResult<T> {
@@ -219,12 +228,12 @@ export async function runJob<T>(opts: {
     for (let attempt = 0; attempt <= RETRIES; attempt++) {
       const started = Date.now();
       try {
-        const { data, usage } = await a.run(client(a.provider, a.kind));
+        const { data, usage, costUsd } = await a.run(client(a.provider, a.kind));
         const u = usage ?? { inputTokens: 0, cachedInputTokens: 0, outputTokens: 0 };
         markOk(a.provider);
         logCall({
           at: new Date().toISOString(), purpose: opts.purpose, provider: a.provider, model: a.model,
-          inputTokens: u.inputTokens, outputTokens: u.outputTokens, costUsd: estimateCost(a.model, u),
+          inputTokens: u.inputTokens, outputTokens: u.outputTokens, costUsd: costUsd ?? estimateCost(a.model, u),
           latencyMs: Date.now() - started, ok: true, fallbackUsed,
         });
         return {
@@ -280,5 +289,29 @@ export function sayHello(provider: Provider): Promise<JobResult<string | null>> 
   });
 }
 
-// TODO(phase-1): writeClaim(), verifyClaim(), segment(), transcribe()
+export const SAM_COST_PER_IMAGE = 0.0025;
+
+/**
+ * SAM 3.1 on one photo for one short concept ("road", "face", ...). Meta only, no AI fallback:
+ * data is null when SAM is unavailable, and the caller applies the no-AI rule from 5.7
+ * ("measurement unavailable" / keep the photo private until blurred).
+ */
+export function segment(jpeg: Buffer, concept: string): Promise<JobResult<SamResult | null>> {
+  return runJob<SamResult | null>({
+    purpose: `sam:${concept}`,
+    attempts: [
+      {
+        provider: "meta",
+        model: MODELS.sam,
+        kind: "agent",
+        run: async () => ({ data: await segmentImage(jpeg, concept), costUsd: SAM_COST_PER_IMAGE }),
+      },
+    ],
+    // Mock: "nothing found" — measurements come out empty, privacy pass treats the photo as clean.
+    mock: () => ({ concept, boxes: [], masks: [] }),
+    lastResort: () => null,
+  });
+}
+
+// TODO(phase-1): writeClaim(), verifyClaim(), transcribe()
 // TODO(phase-2): routeCheck()
