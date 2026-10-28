@@ -4,7 +4,8 @@
 // it snaps the same way a real report would. Fixed ids → re-running updates instead of duplicating.
 // Run: pnpm seed            (upsert demo events + timelines)
 //      pnpm seed --wipe     (delete ALL is_demo rows: events, timelines, reports, photos, claims, news, trips, alerts, users)
-// TODO(phase-3): watched trips + sample alerts · TODO(phase-4): "PWD Mandi (demo)" account + 3 crews.
+// Also upserts demo road crews (Phase 4). The "PWD Mandi (demo)" sign-in is `pnpm create-official`
+// (it needs Supabase Auth); `--wipe` deletes its users row too → re-run create-official after a wipe.
 import { readFileSync } from "node:fs";
 import type { FeatureCollection, LineString } from "geojson";
 import { hasDb, supabaseUrl } from "../src/lib/db/supabase.ts";
@@ -167,7 +168,7 @@ const fromNow = (h: number) => new Date(Date.now() + h * 3_600_000).toISOString(
 
 if (process.argv.includes("--wipe")) {
   // Children first; events cascade to their timeline.
-  for (const t of ["alerts", "watched_trips", "news_items", "claims", "photos", "reports", "event_timeline", "events", "users"]) {
+  for (const t of ["alerts", "watched_trips", "news_items", "official_updates", "crews", "claims", "photos", "reports", "event_timeline", "events", "users"]) {
     await req("DELETE", `${t}?is_demo=eq.true`);
     console.log(`wiped demo rows from ${t}`);
   }
@@ -229,4 +230,21 @@ await req("POST", "events?on_conflict=id", events, "resolution=merge-duplicates,
 // Timelines: replace this seed's items (re-running must not duplicate them).
 await req("DELETE", `event_timeline?event_id=in.(${SEEDS.map((s) => id(s.n)).join(",")})`);
 await req("POST", "event_timeline", timeline, "return=minimal");
+// Demo field updates / official progress photos on seed events would contradict the reset state.
+const seedIds = SEEDS.map((s) => id(s.n)).join(",");
+await req("DELETE", `official_updates?event_id=in.(${seedIds})&is_demo=eq.true`);
+await req("DELETE", `photos?event_id=in.(${seedIds})&source=eq.official&is_demo=eq.true`);
 console.log(`\nseeded ${events.length} demo events + ${timeline.length} timeline items (is_demo=true)`);
+
+// ---------------------------------------------------------------- crews (Command Centre)
+
+const crewId = (n: number) => `00000000-0000-4000-9000-${String(n).padStart(12, "0")}`;
+const crews = [
+  { id: crewId(1), org: "PWD Mandi (demo)", district: "Mandi", name: "Crew A", machines: ["JCB", "JCB"], available: false, current_event_id: id(1) },
+  { id: crewId(2), org: "PWD Mandi (demo)", district: "Mandi", name: "Crew B", machines: ["JCB", "Tipper"], available: true, current_event_id: null },
+  { id: crewId(3), org: "PWD Mandi (demo)", district: "Mandi", name: "Crew C", machines: ["Excavator"], available: true, current_event_id: null },
+  { id: crewId(4), org: "PWD Mandi (demo)", district: "Mandi", name: "Crew D", machines: ["JCB"], available: true, current_event_id: null },
+  { id: crewId(5), org: "BRO (demo)", district: "Lahaul-Spiti", name: "Snow cutter 1", machines: ["Snow cutter"], available: false, current_event_id: id(6) },
+].map((c) => ({ ...c, is_demo: true }));
+await req("POST", "crews?on_conflict=id", crews, "resolution=merge-duplicates,return=minimal");
+console.log(`seeded ${crews.length} demo crews`);
