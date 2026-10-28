@@ -70,3 +70,38 @@ export function parseJson<T>(schema: z.ZodType<T>, text: string | null | undefin
     return null;
   }
 }
+
+// ---------------------------------------------------------------- Route Check agent (Phase 2)
+
+export const RouteVerdict = z.object({
+  verdict: z.enum(["go", "go_with_care", "delay", "avoid"]),
+  /** One short line, e.g. "Leave by 4:00 AM" or "Go now — one lane at Aut, ~20 min wait". */
+  headline: z.string(),
+  headlineHi: z.string().describe("the headline in simple Hindi (Devanagari)"),
+  disruptions: z.array(
+    z.object({
+      eventId: z.string(),
+      order: z.number().int(),
+      etaAtSegment: z.string().describe("ISO time you reach it"),
+      impact: z.string().describe("short, e.g. 'one lane, ~20 min wait; clears ~1–2 PM'"),
+    }),
+  ),
+  /** Departure / route options (What-If). One must be recommended. */
+  options: z
+    .array(
+      z.object({
+        label: z.string().describe("e.g. 'Leave now', 'Leave 4 AM', 'Via NH-3 (avoid Kataula)'"),
+        departAt: z.string().describe("ISO"),
+        arriveAt: z.string().describe("ISO"),
+        viaRoad: z.string().nullable(),
+        pros: z.array(z.string()),
+        cons: z.array(z.string()),
+        recommended: z.boolean(),
+      }),
+    )
+    .min(1)
+    .max(3),
+  reasoning: z.string().describe("2–4 short sentences: why, naming the evidence"),
+  usedSources: z.array(z.string()).describe("e.g. 'traveller reports (9)', 'Open-Meteo forecast', 'PWD update'"),
+});
+export type RouteVerdict = z.infer<typeof RouteVerdict>;

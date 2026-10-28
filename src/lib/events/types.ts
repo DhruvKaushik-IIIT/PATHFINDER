@@ -48,3 +48,46 @@ export function ago(iso: string, now = Date.now()): string {
   const h = Math.round(min / 60);
   return h < 48 ? `${h} h ago` : `${Math.round(h / 24)} d ago`;
 }
+
+export interface Range {
+  min: number;
+  max: number;
+}
+
+export interface EventPhoto {
+  id: string;
+  publicUrl: string | null;
+  annotatedUrl: string | null;
+  createdAt: string;
+  source: string;
+  facesBlurred: boolean;
+  width: number | null;
+  height: number | null;
+}
+
+export interface TimelineItem {
+  at: string;
+  kind: string;
+  text: string;
+  actor: string | null;
+}
+
+/** GET /api/events/[id] — everything the detail + photo screens show. */
+export interface EventDetail extends MapEvent {
+  passable: { bike: boolean | null; car: boolean | null; bus: boolean | null };
+  measurements: {
+    blockedLengthM?: Range | null;
+    roadWidthLeftM?: Range | null;
+    roadTotalWidthM?: Range | number | null;
+    blockedPct?: Range | null;
+    debrisVolumeM3?: Range | null;
+    vehiclesVisible?: number | null;
+  };
+  etaClear: { earliest: string; latest: string } | null;
+  summaryHi: string | null;
+  startedAt: string;
+  resolvedAt: string | null;
+  sources: { reports: number; official: number; news: number; notices: number };
+  photos: EventPhoto[];
+  timeline: TimelineItem[];
+}

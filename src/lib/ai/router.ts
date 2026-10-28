@@ -10,7 +10,9 @@ import { readFileSync } from "node:fs";
 import { CLAIM_SYSTEM, claimUserText } from "./prompts/claim.ts";
 import { VERIFY_SYSTEM, verifyUserText } from "./prompts/verify.ts";
 import { segmentImage, type SamResult } from "./sam.ts";
-import { ClaimSet, jsonSchemaFormat, parseJson, Verdict, type Claim } from "./schemas.ts";
+import { ROUTE_CHECK_SYSTEM, routeCheckUserText } from "./prompts/routeCheck.ts";
+import { ClaimSet, jsonSchemaFormat, parseJson, RouteVerdict, Verdict, type Claim } from "./schemas.ts";
+import { ist, ROUTE_CHECK_TOOLS, runRouteCheckTool, type RouteCheckContext } from "./tools/routeCheck.ts";
 import { z } from "zod";
 import { transcribeWav } from "./voice.ts";
 
@@ -119,8 +121,15 @@ export function classifyError(err: unknown): ClassifiedError {
   return { kind: "unknown", retry: false, tripBreaker: false, message };
 }
 
-/** Throw this from an attempt when the model replied but the output is unusable (e.g. failed zod). */
-export class InvalidOutputError extends Error {}
+/** Throw this from an attempt when the model replied but the output is unusable (e.g. failed zod).
+ *  Pass the tokens already spent so ai_calls still records the cost of the failed attempt. */
+export class InvalidOutputError extends Error {
+  readonly usage?: Usage;
+  constructor(message: string, usage?: Usage) {
+    super(message);
+    this.usage = usage;
+  }
+}
 
 // ---------------------------------------------------------------- cost + logging
 
@@ -248,9 +257,11 @@ export async function runJob<T>(opts: {
         };
       } catch (err) {
         const e = classifyError(err);
+        const spent = err instanceof InvalidOutputError ? err.usage : undefined;
         logCall({
           at: new Date().toISOString(), purpose: opts.purpose, provider: a.provider, model: a.model,
-          inputTokens: 0, outputTokens: 0, costUsd: null, latencyMs: Date.now() - started,
+          inputTokens: spent?.inputTokens ?? 0, outputTokens: spent?.outputTokens ?? 0,
+          costUsd: spent ? estimateCost(a.model, spent) : null, latencyMs: Date.now() - started,
           ok: false, fallbackUsed, errorKind: e.kind,
         });
         if (e.tripBreaker) markDown(a.provider, `${e.kind}${e.status ? ` ${e.status}` : ""}: ${e.message}`);
@@ -475,3 +486,145 @@ export function transcribe(wav: Buffer): Promise<JobResult<Transcript | null>> {
   });
 }
 // TODO(phase-2): routeCheck()
+
+// ---------------------------------------------------------------- agents (tool-calling loop)
+
+type Effort = "minimal" | "low" | "medium" | "high";
+
+export interface AgentOutput<T> {
+  data: T;
+  /** Tool calls made, in order (shown in "why" UI / logs). */
+  trace: string[];
+  turns: number;
+}
+
+/**
+ * Generic tool loop (cookbook 01/03): call → run every tool_call → feed results back → repeat.
+ * The agent ends by calling the `submit` tool, whose arguments are validated with zod (invalid →
+ * the error goes back to the model to fix). tool_choice must be "auto" on Meta.
+ */
+async function agentLoop<T>(
+  c: OpenAI,
+  provider: Provider,
+  model: string,
+  opts: {
+    system: string;
+    user: string;
+    tools: OpenAI.Chat.Completions.ChatCompletionTool[];
+    exec: (name: string, args: string) => Promise<unknown>;
+    submit: { name: string; schema: z.ZodType<T> };
+    maxTurns: number;
+    effort: Effort;
+  },
+): Promise<{ data: AgentOutput<T>; usage: Usage }> {
+  const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+    { role: provider === "meta" ? "developer" : "system", content: opts.system },
+    { role: "user", content: opts.user },
+  ];
+  const usage: Usage = { inputTokens: 0, cachedInputTokens: 0, outputTokens: 0 };
+  const trace: string[] = [];
+  let nudged = false;
+
+  for (let turn = 1; turn <= opts.maxTurns; turn++) {
+    const r = await c.chat.completions.create({
+      model,
+      messages,
+      tools: opts.tools,
+      tool_choice: "auto",
+      reasoning_effort: opts.effort,
+    });
+    const u = usageFromChat(r);
+    usage.inputTokens += u.inputTokens;
+    usage.cachedInputTokens += u.cachedInputTokens;
+    usage.outputTokens += u.outputTokens;
+
+    const msg = r.choices[0]?.message;
+    const calls = (msg?.tool_calls ?? []).filter((tc) => tc.type === "function");
+    if (!msg || !calls.length) {
+      // Some turns answer with the verdict as plain JSON instead of the tool: accept it if it validates.
+      const asText = parseJson(opts.submit.schema, msg?.content);
+      if (asText) return { data: { data: asText, trace: [...trace, `${opts.submit.name} (as text)`], turns: turn }, usage };
+      if (nudged) break;
+      nudged = true;
+      messages.push({ role: "assistant", content: msg?.content ?? "" });
+      messages.push({ role: "user", content: `Now call ${opts.submit.name} with your final answer.` });
+      continue;
+    }
+    messages.push({ role: "assistant", content: msg.content ?? null, tool_calls: calls });
+
+    let submitted: T | null = null;
+    const results = await Promise.all(
+      calls.map(async (tc) => {
+        const { name, arguments: args } = tc.function;
+        trace.push(name === opts.submit.name ? name : `${name}(${args.length > 80 ? `${args.slice(0, 80)}…` : args})`);
+        if (name !== opts.submit.name) return { id: tc.id, content: JSON.stringify(await opts.exec(name, args)).slice(0, 12_000) };
+        const parsed = (() => {
+          try {
+            return opts.submit.schema.safeParse(JSON.parse(args));
+          } catch {
+            return null;
+          }
+        })();
+        if (parsed?.success) {
+          submitted = parsed.data;
+          return { id: tc.id, content: "ok" };
+        }
+        const issues = parsed ? parsed.error.issues.slice(0, 5).map((i) => `${i.path.join(".")}: ${i.message}`).join("; ") : "not valid JSON";
+        return { id: tc.id, content: JSON.stringify({ error: `invalid ${opts.submit.name}: ${issues}. Fix and call it again.` }) };
+      }),
+    );
+    if (submitted !== null) return { data: { data: submitted, trace, turns: turn }, usage };
+    for (const res of results) messages.push({ role: "tool", tool_call_id: res.id, content: res.content });
+  }
+  throw new InvalidOutputError(`agent ended without a valid ${opts.submit.name}`, usage);
+}
+
+export interface RouteCheckOutput {
+  verdict: RouteVerdict;
+  by: Provider | "mock" | "code";
+  trace: string[];
+}
+
+/**
+ * Route Check agent (6.4). tier "wonder" (several events / a closure): Meta Muse Wonder → Baseten Spark Open.
+ * tier "spark" (one event): Baseten Spark Open → Meta Spark. Last resort: the code-built verdict.
+ */
+export function routeCheck(
+  ctx: RouteCheckContext,
+  tier: "spark" | "wonder",
+  codeVerdict: () => RouteVerdict,
+): Promise<JobResult<RouteCheckOutput>> {
+  const user = routeCheckUserText({
+    from: ctx.plan.from.name,
+    to: ctx.plan.to.name,
+    departAt: ist(ctx.plan.departAt),
+    now: ist(new Date()),
+  });
+  const attempt = (provider: Provider, model: string, effort: Effort): Attempt<RouteCheckOutput> => ({
+    provider,
+    model,
+    kind: "agent",
+    run: async (c) => {
+      const { data, usage } = await agentLoop(c, provider, model, {
+        system: ROUTE_CHECK_SYSTEM,
+        user,
+        tools: ROUTE_CHECK_TOOLS,
+        exec: (name, args) => runRouteCheckTool(ctx, name, args),
+        submit: { name: "submit_verdict", schema: RouteVerdict },
+        maxTurns: 6,
+        effort,
+      });
+      return { data: { verdict: data.data, by: provider, trace: data.trace }, usage };
+    },
+  });
+  const attempts =
+    tier === "wonder"
+      ? [attempt("meta", MODELS.wonder, "medium"), attempt("baseten", MODELS.sparkOpen, "medium")]
+      : [attempt("baseten", MODELS.sparkOpen, "low"), attempt("meta", MODELS.spark, "low")];
+  return runJob<RouteCheckOutput>({
+    purpose: `route_check:${tier}`,
+    attempts,
+    mock: () => ({ verdict: codeVerdict(), by: "mock", trace: [] }),
+    lastResort: () => ({ verdict: codeVerdict(), by: "code", trace: [] }),
+  });
+}

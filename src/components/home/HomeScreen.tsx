@@ -1,16 +1,19 @@
 "use client";
 
 // Frame 02 Home (docs/design/glass-html/Main.dc.html): map + floating glass buttons + bottom sheet.
-import { Bell, Camera, ChevronRight, Eye, Layers, Mic, Navigation, Route, Search, Target, User } from "lucide-react";
+import { Bell, Camera, ChevronRight, Eye, Layers, MapPin, Navigation, Route, Target, User } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useRef, useState } from "react";
-import type { MapRef } from "react-map-gl/maplibre";
+import { useCallback, useRef, useState } from "react";
+import { Marker, type MapRef } from "react-map-gl/maplibre";
+import PlaceCard from "@/components/home/PlaceCard";
+import PlaceSearch from "@/components/home/PlaceSearch";
 import Sheet from "@/components/glass/Sheet";
 import EventPeek from "@/components/map/EventPeek";
 import type { LatLng } from "@/components/map/MapView";
 import { useEvents } from "@/components/map/useEvents";
 import type { MapEvent } from "@/lib/events/types";
+import type { Place } from "@/lib/geo/placeTypes";
 
 // MapLibre needs `window` → client-only.
 const MapView = dynamic(() => import("@/components/map/MapView"), {
@@ -25,6 +28,15 @@ export default function HomeScreen() {
   const [locating, setLocating] = useState(false);
   const { events, refresh } = useEvents(mapRef);
   const [selected, setSelected] = useState<MapEvent | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [picked, setPicked] = useState<Place | null>(null);
+  const onSearchActive = useCallback((active: boolean) => setSearching(active), []);
+
+  function pick(p: Place) {
+    setPicked(p);
+    setSelected(null);
+    mapRef.current?.flyTo({ center: [p.lng, p.lat], zoom: Math.max(mapRef.current.getZoom(), 10) });
+  }
 
   function locate() {
     if (!("geolocation" in navigator)) return;
@@ -51,7 +63,13 @@ export default function HomeScreen() {
         selectedEventId={selected?.id ?? null}
         onSelectEvent={setSelected}
         onViewChange={refresh}
-      />
+      >
+        {picked && (
+          <Marker latitude={picked.lat} longitude={picked.lng} anchor="bottom">
+            <MapPin size={34} strokeWidth={2} className="text-accent drop-shadow" fill="white" aria-label={picked.name} />
+          </Marker>
+        )}
+      </MapView>
 
       {selected && (
         <div className="absolute inset-x-[14px] top-[214px] z-20 mx-auto max-w-[452px]">
@@ -96,20 +114,19 @@ export default function HomeScreen() {
 
       <Sheet label="Plan, explore or report" initial="half">
         <div className="flex flex-col gap-4">
-          <label className="flex h-12 items-center gap-[10px] rounded-[14px] bg-[rgba(118,118,128,0.14)] px-[14px]">
-            <Search size={18} strokeWidth={2.2} className="text-[#3C3C43]" aria-hidden />
-            <span className="sr-only">Where to?</span>
-            {/* TODO(phase-2): Photon + places.json autocomplete */}
-            <input
-              type="text"
-              placeholder="Where to?"
-              className="min-w-0 flex-1 bg-transparent text-[17px] text-ink outline-none placeholder:text-ink-3"
-            />
-            <button type="button" aria-label="Speak destination" className="flex size-8 items-center justify-center text-[#3C3C43]">
-              <Mic size={18} strokeWidth={2} aria-hidden />
-            </button>
-          </label>
+          <PlaceSearch onPick={pick} onFocusChange={onSearchActive} />
 
+          {picked && !searching && (
+            <PlaceCard
+              key={picked.id}
+              place={picked}
+              origin={me ? { name: "Your location", lat: me.latitude, lng: me.longitude, isMe: true } : { name: "Mandi", lat: 31.708, lng: 76.932, isMe: false }}
+              onClose={() => setPicked(null)}
+            />
+          )}
+
+          {!searching && (
+          <>
           <div className="grid grid-cols-3 gap-[10px]">
             <Tile href="/route" label="Journey" icon={<Route size={26} strokeWidth={2} aria-hidden />} />
             <Tile href="/nearby" label="Nearby" icon={<Target size={26} strokeWidth={2} aria-hidden />} />
@@ -130,6 +147,8 @@ export default function HomeScreen() {
             title="Watch a trip"
             subtitle="Get an alert if your route changes"
           />
+          </>
+          )}
         </div>
       </Sheet>
     </main>

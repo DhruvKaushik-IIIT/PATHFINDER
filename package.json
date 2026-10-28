@@ -19,6 +19,7 @@
     "test:voice": "node --env-file-if-exists=.env.local scripts/test-voice.ts",
     "test:pipeline": "node --env-file-if-exists=.env.local scripts/test-pipeline.ts",
     "test:claim": "node --env-file-if-exists=.env.local scripts/test-claim.ts",
+    "test:route-check": "node --env-file-if-exists=.env.local scripts/test-route-check.ts",
     "fetch-roads": "node --env-file-if-exists=.env.local scripts/fetch-roads.ts",
     "fetch-places": "node --env-file-if-exists=.env.local scripts/fetch-places.ts",
     "load-segments": "node --env-file-if-exists=.env.local scripts/load-segments.ts",
