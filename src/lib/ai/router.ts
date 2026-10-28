@@ -11,7 +11,8 @@ import { CLAIM_SYSTEM, claimUserText } from "./prompts/claim.ts";
 import { VERIFY_SYSTEM, verifyUserText } from "./prompts/verify.ts";
 import { segmentImage, type SamResult } from "./sam.ts";
 import { ROUTE_CHECK_SYSTEM, routeCheckUserText } from "./prompts/routeCheck.ts";
-import { ClaimSet, jsonSchemaFormat, parseJson, RouteVerdict, Verdict, type Claim } from "./schemas.ts";
+import { NEARBY_SYSTEM, nearbyUserText } from "./prompts/nearby.ts";
+import { ClaimSet, jsonSchemaFormat, NearbySummary, parseJson, RouteVerdict, Verdict, type Claim } from "./schemas.ts";
 import { ist, ROUTE_CHECK_TOOLS, runRouteCheckTool, type RouteCheckContext } from "./tools/routeCheck.ts";
 import { z } from "zod";
 import { transcribeWav } from "./voice.ts";
@@ -485,7 +486,26 @@ export function transcribe(wav: Buffer): Promise<JobResult<Transcript | null>> {
     lastResort: () => null,
   });
 }
-// TODO(phase-2): routeCheck()
+// ---------------------------------------------------------------- nearby summary (Phase 3)
+
+/** Ranked events around a place → 1–2 sentences EN + HI. Baseten → Meta Spark → template from code. */
+export function nearbySummary(
+  input: Parameters<typeof nearbyUserText>[0],
+  template: () => NearbySummary,
+): Promise<JobResult<NearbySummary>> {
+  const content: ChatContent = [{ type: "text", text: nearbyUserText(input) }];
+  const attempt = (provider: Provider, model: string): Attempt<NearbySummary> => ({
+    provider,
+    model,
+    run: (c) => chatJson(c, provider, model, { name: "nearby_summary", schema: NearbySummary, system: NEARBY_SYSTEM, content }),
+  });
+  return runJob<NearbySummary>({
+    purpose: "nearby_summary",
+    attempts: [attempt("baseten", MODELS.sparkOpen), attempt("meta", MODELS.spark)],
+    mock: template,
+    lastResort: template,
+  });
+}
 
 // ---------------------------------------------------------------- agents (tool-calling loop)
 

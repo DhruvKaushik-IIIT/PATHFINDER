@@ -15,6 +15,7 @@ export interface MapEvent {
   reports: number;
   modelsAgreed: number | null;
   photoUrl: string | null;
+  etaClear?: { earliest: string; latest: string } | null;
 }
 
 // CLAUDE.md 7.2 — status is ALWAYS word + colour.
@@ -90,4 +91,22 @@ export interface EventDetail extends MapEvent {
   sources: { reports: number; official: number; news: number; notices: number };
   photos: EventPhoto[];
   timeline: TimelineItem[];
+}
+
+/** GET /api/nearby — one ranked event within the radius. */
+export interface NearbyItem extends MapEvent {
+  distanceKm: number;
+  /** Ranking score (severity × confidence × proximity × freshness), higher first. */
+  score: number;
+}
+
+export interface NearbyResult {
+  center: { lat: number; lng: number; name: string };
+  radiusKm: number;
+  counts: { closed: number; oneLane: number; slow: number; other: number };
+  items: NearbyItem[];
+  summary: string;
+  summaryHi: string | null;
+  /** "baseten" / "meta" when an AI wrote the summary; "code" for the template. */
+  summaryBy: string;
 }

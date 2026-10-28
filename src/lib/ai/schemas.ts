@@ -105,3 +105,11 @@ export const RouteVerdict = z.object({
   usedSources: z.array(z.string()).describe("e.g. 'traveller reports (9)', 'Open-Meteo forecast', 'PWD update'"),
 });
 export type RouteVerdict = z.infer<typeof RouteVerdict>;
+
+// ---------------------------------------------------------------- Nearby (Phase 3)
+
+export const NearbySummary = z.object({
+  summary: z.string().describe("1–2 short sentences, plain English"),
+  summaryHi: z.string().describe("the same in simple Hindi (Devanagari)"),
+});
+export type NearbySummary = z.infer<typeof NearbySummary>;
