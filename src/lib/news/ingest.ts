@@ -76,7 +76,7 @@ function sameName(asked: string, found: string): boolean {
 }
 
 /** Place name → coordinates inside Himachal (our places first, then Photon). */
-async function locate(name: string): Promise<{ lat: number; lng: number; name: string } | null> {
+export async function locate(name: string): Promise<{ lat: number; lng: number; name: string } | null> {
   const clean = name.replace(/\b(near|village|town|district|pass)\b/gi, " ").replace(/\s+/g, " ").trim();
   for (const q of [name, clean]) {
     const { places } = await searchPlaces(q);

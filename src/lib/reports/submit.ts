@@ -11,6 +11,10 @@ import { insert, publicUrl, select, update, upload } from "../db/supabase.ts";
 import { snapToRoad } from "../geo/snap.ts";
 import { annotate } from "../images/annotate.ts";
 import { applyToWorldState, pointsFor, type EventResult } from "./events.ts";
+import { noteMentions } from "./mentions.ts";
+import type { VerificationRecord } from "../verification/types.ts";
+import { creditUser } from "../me.ts";
+import { fulfilScoutRequest } from "../scout/requests.ts";
 import { processPhoto, type PreparedPhoto } from "./processPhoto.ts";
 
 export interface SubmitInput {
@@ -19,6 +23,12 @@ export interface SubmitInput {
   lng: number;
   text: string | null;
   voiceWav: Buffer | null;
+  /** Anonymous device user (pf_uid) — gets the points. */
+  userId?: string | null;
+  /** Set when this photo answers a scout request (/report?scout=…): bonus points + request fulfilled. */
+  scoutRequestId?: string | null;
+  /** When a library photo was taken (EXIF / file time, sent by the browser). Camera shots: null = now. */
+  takenAt?: string | null;
 }
 
 export interface SubmitResult {
@@ -28,6 +38,8 @@ export interface SubmitResult {
   eventAction: EventResult["action"];
   eventReports: number;
   points: number;
+  /** Extra points for answering a scout request (0 otherwise). */
+  scoutBonus: number;
   lat: number;
   lng: number;
   reportStatus: EventResult["reportStatus"];
@@ -39,7 +51,13 @@ export interface SubmitResult {
   verdict: Verdict | null;
   verifiedBy: string | null;
   modelsAgreed: number;
+  /** Who wrote the claim and who checked it (dual-model verification). */
+  verification: VerificationRecord | null;
+  /** Why the report didn't change the road's status (old photo / conflicting with a fresh confirmation). */
+  timeCheck: string | null;
   transcript: string | null;
+  /** Other places the voice note mentioned, and the open event each was matched to (if any). */
+  mentions: { placeHint: string; eventId: string | null }[];
   measurements: unknown;
   facesBlurred: boolean;
   timingsMs: Record<string, number>;
@@ -53,6 +71,10 @@ export async function submitReport(input: SubmitInput): Promise<SubmitResult> {
   const timings: Record<string, number> = {};
   const degraded: string[] = [];
   const { photo, lat, lng, text } = input;
+  // Time-consistency: a clock in the future (bad phone time) is ignored.
+  const takenMs = input.takenAt ? Date.parse(input.takenAt) : NaN;
+  const photoAgeH = Number.isFinite(takenMs) && takenMs < Date.now() + 3_600_000 ? Math.max(0, (Date.now() - takenMs) / 3_600_000) : null;
+  const shotAt = photoAgeH !== null ? new Date(takenMs).toISOString() : new Date().toISOString();
 
   const [p, voice, snap] = await Promise.all([
     processPhoto(photo).finally(() => (timings.sam = Date.now() - t0)),
@@ -70,7 +92,7 @@ export async function submitReport(input: SubmitInput): Promise<SubmitResult> {
     roadRef: snap.segment?.road_ref ?? snap.segment?.road_name ?? null,
     lat,
     lng,
-    at: new Date().toISOString(),
+    at: shotAt,
     samMeasurements: p.measurements,
     transcript,
     text,
@@ -85,9 +107,10 @@ export async function submitReport(input: SubmitInput): Promise<SubmitResult> {
   let verdict: Verdict | null = null;
   let verifiedBy: string | null = null;
   let modelsAgreed = 0;
+  let verification: VerificationRecord | null = null;
   if (here) {
     const t2 = Date.now();
-    const ctx = `Photo taken by a traveller at ${snap.placeName ?? "an unknown place"}${snap.segment?.road_ref ? ` on ${snap.segment.road_ref}` : ""}, just now.`;
+    const ctx = `Photo taken by a traveller at ${snap.placeName ?? "an unknown place"}${snap.segment?.road_ref ? ` on ${snap.segment.road_ref}` : ""}, ${photoAgeH !== null && photoAgeH >= 1 ? `about ${Math.round(photoAgeH)} h ago (the photo's own timestamp)` : "just now"}.`;
     const v = await verifyClaim(p.original, here, ctx);
     timings.verify = Date.now() - t2;
     verdict = v.data.verdict;
@@ -96,10 +119,22 @@ export async function submitReport(input: SubmitInput): Promise<SubmitResult> {
     // Two models agree only if they're different providers (Spark Open on Baseten vs Spark on Meta).
     const differentModels = claimRes.source !== verifiedBy && verifiedBy !== "rules";
     modelsAgreed = verdict.agrees && differentModels ? 2 : 1;
+    verification = {
+      claimBy: claimRes.source,
+      verifiedBy: verifiedBy as VerificationRecord["verifiedBy"],
+      verdict: verdict.verdict,
+      agrees: verdict.agrees,
+      twoModels: differentModels,
+      confidence: verdict.confidence,
+      claimed: { status: here.status, type: here.eventType },
+      corrected: { status: verdict.correctedStatus, type: verdict.correctedEventType },
+      reasoning: verdict.reasoning,
+    };
   }
 
   // ---- persist
   const [report] = await insert<{ id: string }>("reports", {
+    user_id: input.userId ?? null,
     lat, lng, text,
     segment_id: snap.segment?.id ?? null,
     media_type: "photo",
@@ -126,22 +161,27 @@ export async function submitReport(input: SubmitInput): Promise<SubmitResult> {
     sam_masks: p.sam,
     measurements: p.measurements,
     faces_blurred: p.facesBlurred,
-    source: "traveller",
+    source: input.scoutRequestId ? "scout" : "traveller",
   });
   if (claims.length) {
     await insert(
       "claims",
-      claims.map((c) => ({ report_id: id, source: "photo", payload: c, confidence: c.confidence })),
+      // The verifier's view rides on the photo's own claim (no schema change): agreement stats read it.
+      claims.map((c) => ({ report_id: id, source: "photo", payload: c === here && verification ? { ...c, verification } : c, confidence: c.confidence })),
     );
   }
-  // TODO(phase-5): claims about OTHER places (atReportLocation=false, placeHint) go to the Investigator.
+  // Claims about OTHER places (voice note): evidence on a nearby open event's timeline, never a new event.
+  const mentions = await noteMentions(claims, id).catch((err: Error) => {
+    console.warn("[reports] mentions failed:", err.message);
+    return [];
+  });
 
   let ev: EventResult = { eventId: null, action: "none", reportStatus: "pending", eventReports: 0 };
   if (here && verdict) {
     ev = await applyToWorldState({
       claim: here, verdict, verifiedBy: verifiedBy!, modelsAgreed,
       segmentId: snap.segment?.id ?? null, placeName: snap.placeName, lat, lng,
-      reportId: id, photoUrl: pubUrl,
+      reportId: id, photoUrl: pubUrl, sam: p.measurements, verification, photoAgeH,
     });
   }
 
@@ -166,8 +206,11 @@ export async function submitReport(input: SubmitInput): Promise<SubmitResult> {
     }
   }
 
+  const scoutBonus = input.scoutRequestId && ev.reportStatus !== "rejected" ? await fulfilScoutRequest(input.scoutRequestId, id) : 0;
+  const points = pointsFor(ev, verdict) + scoutBonus;
+  if (input.userId) await creditUser(input.userId, points, { lat, lng }).catch((err: Error) => console.warn("[reports] points failed:", err.message));
   await Promise.all([
-    update("reports", `id=eq.${id}`, { status: ev.reportStatus, event_id: ev.eventId, points_awarded: pointsFor(ev) }),
+    update("reports", `id=eq.${id}`, { status: ev.reportStatus, event_id: ev.eventId, points_awarded: points }),
     update("photos", `id=eq.${photoRow!.id}`, { event_id: ev.eventId, annotated_url: annotatedUrl }),
   ]);
   timings.total = Date.now() - t0;
@@ -178,7 +221,8 @@ export async function submitReport(input: SubmitInput): Promise<SubmitResult> {
     eventId: ev.eventId,
     eventAction: ev.action,
     eventReports: ev.eventReports,
-    points: pointsFor(ev),
+    points,
+    scoutBonus,
     lat,
     lng,
     reportStatus: ev.reportStatus,
@@ -192,7 +236,10 @@ export async function submitReport(input: SubmitInput): Promise<SubmitResult> {
     verdict,
     verifiedBy,
     modelsAgreed,
+    verification,
+    timeCheck: ev.timeCheck ?? null,
     transcript,
+    mentions,
     measurements: p.measurements,
     facesBlurred: p.facesBlurred,
     timingsMs: timings,

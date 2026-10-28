@@ -11,6 +11,8 @@ import Toast from "@/components/glass/Toast";
 import { useEvents } from "@/components/map/useEvents";
 import { TYPE_WORD } from "@/lib/events/types";
 import { LAST_REPORT_KEY } from "./storage";
+import { checkerSays } from "@/components/verification/ModelChecks";
+import { MODEL_NAME, type VerificationRecord } from "@/lib/verification/types";
 
 const MapView = dynamic(() => import("@/components/map/MapView"), {
   ssr: false,
@@ -25,11 +27,14 @@ interface Result {
   eventAction: "created" | "merged" | "noted" | "none";
   eventReports: number;
   points: number;
+  scoutBonus?: number;
   placeName: string | null;
   road: { ref: string | null; name: string | null } | null;
   claims: { eventType: string; status: string; measurements: { blockedPct: { min: number; max: number } | null } }[];
   verdict: { confidence: number; correctedEventType: string | null; correctedStatus: string | null } | null;
   modelsAgreed: number;
+  verification?: VerificationRecord | null;
+  timeCheck?: string | null;
   transcript: string | null;
 }
 
@@ -51,6 +56,14 @@ export default function ReportDone() {
   const [result, setResult] = useState<Result | null>(null);
   const [degraded, setDegraded] = useState<string | null>(null);
   const [missing, setMissing] = useState(false);
+  const [total, setTotal] = useState<{ points: number; verified: number } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/me")
+      .then((r) => r.json() as Promise<{ data?: { exists: boolean; points: number; verified: number } | null }>)
+      .then((b) => b.data?.exists && setTotal({ points: b.data.points, verified: b.data.verified }))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     try {
@@ -126,15 +139,25 @@ export default function ReportDone() {
                 ? `Now on the map for travellers${road ? ` on ${road}` : ""}`
                 : rejected
                   ? "It doesn't look like a road condition — try another angle"
-                  : "We'll add it once another report or the AI confirms it"}
+                  : (result.timeCheck ?? "We'll add it once another report or the AI confirms it")}
             </span>
           </span>
         </div>
 
         <div className="glass-card px-[14px] py-1">
           <Row label="AI found" value={aiFound(result)} />
-          {result.modelsAgreed >= 2 && result.verdict && (
-            <Row label="Checked by" value={`2 AI models agree · ${Math.round(result.verdict.confidence * 100)}%`} />
+          {result.verification ? (
+            <Row
+              label="Checked by"
+              value={
+                result.verification.twoModels
+                  ? `${MODEL_NAME[result.verification.claimBy]} + ${MODEL_NAME[result.verification.verifiedBy]}: ${result.modelsAgreed >= 2 ? `agree · ${Math.round(result.verification.confidence * 100)}%` : checkerSays(result.verification)}`
+                  : `${MODEL_NAME[result.verification.verifiedBy]} only · ${checkerSays(result.verification)}`
+              }
+            />
+          ) : (
+            result.modelsAgreed >= 2 &&
+            result.verdict && <Row label="Checked by" value={`2 AI models agree · ${Math.round(result.verdict.confidence * 100)}%`} />
           )}
           <Row
             label="Matched with"
@@ -154,8 +177,20 @@ export default function ReportDone() {
         {result.points > 0 && (
           <div className="flex items-center gap-[10px] rounded-[14px] bg-white/84 px-[14px] py-3">
             <span className="rounded-[9px] bg-accent-tint px-[9px] py-[5px] text-[14px] font-bold text-accent-tint-ink">+{result.points}</span>
-            {/* TODO(phase-5): running total + verified count from /api/me */}
-            <span className="text-[14px]">Scout points{result.eventAction === "created" ? " · first to report" : ""}</span>
+            <span className="flex min-w-0 flex-1 flex-col">
+              <span className="text-[14px]">
+                Scout points{result.eventAction === "created" ? " · first to report" : ""}
+                {result.scoutBonus ? ` · +${result.scoutBonus} for answering a scout request` : ""}
+              </span>
+              {total && (
+                <span className="text-[12px] text-ink-2">
+                  {total.points} points · {total.verified} verified
+                </span>
+              )}
+            </span>
+            <Link href="/me" className="shrink-0 text-[14px] font-semibold text-link no-underline">
+              Me
+            </Link>
           </div>
         )}
 

@@ -29,7 +29,12 @@
     "test:risk": "node --env-file-if-exists=.env.local scripts/test-risk.ts",
     "fetch-weather-replay": "node scripts/fetch-weather-replay.ts",
     "create-official": "node --env-file-if-exists=.env.local scripts/create-official.ts",
-    "test:dispatch": "node --env-file-if-exists=.env.local scripts/test-dispatch.ts"
+    "test:dispatch": "node --env-file-if-exists=.env.local scripts/test-dispatch.ts",
+    "test:reopening": "node --env-file-if-exists=.env.local scripts/test-reopening.ts",
+    "test:investigator": "node --env-file-if-exists=.env.local scripts/test-investigator.ts",
+    "test:scout": "node --env-file-if-exists=.env.local scripts/test-scout.ts",
+    "test:share": "node --env-file-if-exists=.env.local scripts/test-share.ts",
+    "test:time-check": "node --env-file-if-exists=.env.local scripts/test-time-check.ts"
   },
   "dependencies": {
     "@meta-sam/parser": "^0.1.0",

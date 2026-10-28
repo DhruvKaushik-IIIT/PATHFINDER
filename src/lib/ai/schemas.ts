@@ -163,3 +163,19 @@ export const Advisory = z.object({
   hi: z.string().describe("the same advisory in simple Hindi (Devanagari)"),
 });
 export type Advisory = z.infer<typeof Advisory>;
+
+// ---------------------------------------------------------------- Investigator (Phase 5)
+
+/** What the Investigator submits. Code decides what changes (it never sets an event's status). */
+export const Investigation = z.object({
+  finding: z
+    .enum(["still_there", "likely_changed", "likely_cleared", "conflicting", "no_new_evidence"])
+    .describe("still_there = evidence says the event is as shown; likely_changed = status probably different now; likely_cleared = probably open again; conflicting = sources disagree; no_new_evidence = nothing to go on"),
+  suggestedStatus: z.enum(STATUSES).nullable().describe("only when finding is likely_changed / likely_cleared"),
+  confidence: z.number().min(0).max(1).describe("how likely the event, as currently shown, is right NOW"),
+  explanation: z.string().describe("1–2 short sentences for travellers: what the evidence says and how fresh it is"),
+  explanationHi: z.string().describe("the same in simple Hindi (Devanagari)"),
+  evidence: z.array(z.string()).max(6).describe("short lines, each naming its source and time, e.g. 'PWD update 2 h ago: 70% cleared'"),
+  scoutQuestion: z.string().nullable().describe("if a fresh photo would settle it: one short question for a traveller nearby, else null"),
+});
+export type Investigation = z.infer<typeof Investigation>;
