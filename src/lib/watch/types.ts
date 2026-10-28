@@ -51,6 +51,10 @@ export interface Alert {
     verdict?: Verdict;
     changes?: TripChange[];
     by?: string;
+    /** Official advisory (Command Centre): Hindi text + event. */
+    advisory?: boolean;
+    hi?: string;
+    eventId?: string;
   } | null;
   read: boolean;
   createdAt: string;

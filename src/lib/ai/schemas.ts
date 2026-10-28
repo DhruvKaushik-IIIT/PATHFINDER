@@ -135,3 +135,31 @@ export type NewsItem = z.infer<typeof NewsItem>;
 
 export const NewsItems = z.object({ items: z.array(NewsItem).max(12) });
 export type NewsItems = z.infer<typeof NewsItems>;
+
+// ---------------------------------------------------------------- Command Centre (Phase 4)
+
+/** What the Crew Dispatch agent submits; vehicle-hours are recomputed in code from these steps. */
+export const DispatchProposal = z.object({
+  steps: z
+    .array(
+      z.object({
+        crewId: z.string(),
+        eventId: z.string(),
+        action: z.enum(["keep", "send", "send_later"]).describe("keep = stay on the current job; send = go now; send_later = go after something (rain, another job)"),
+        when: z.string().describe('short timing in IST, e.g. "now", "after Aut clears (~2 PM)", "after the rain (~4 PM)"'),
+        text: z.string().describe("one plain sentence for the official, e.g. 'Send Crew B to Kataula now — fully closed, no detour.'"),
+      }),
+    )
+    .min(1)
+    .max(8),
+  headline: z.string().describe("one line, e.g. 'Clear Kataula first, keep Aut going'"),
+  headlineHi: z.string().describe("the same in simple Hindi (Devanagari)"),
+  reasoning: z.string().describe("2–3 short sentences: why this order, naming the evidence"),
+});
+export type DispatchProposal = z.infer<typeof DispatchProposal>;
+
+export const Advisory = z.object({
+  en: z.string().describe("public advisory in English, 1–2 sentences, at most 220 characters"),
+  hi: z.string().describe("the same advisory in simple Hindi (Devanagari)"),
+});
+export type Advisory = z.infer<typeof Advisory>;

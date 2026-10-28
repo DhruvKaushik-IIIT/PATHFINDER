@@ -10,6 +10,8 @@ import { useEffect, useState } from "react";
 import { approxRange, clearWindow } from "@/lib/events/format";
 import { ago, STATUS_STYLE, type EventDetail } from "@/lib/events/types";
 import { eventTitle } from "@/components/route/routeData";
+import CrewCard from "@/components/repairs/CrewCard";
+import type { Repair } from "@/lib/repairs/types";
 
 const MapView = dynamic(() => import("@/components/map/MapView"), {
   ssr: false,
@@ -23,6 +25,7 @@ export default function EventScreen({ id }: { id: string }) {
   const router = useRouter();
   const [ev, setEv] = useState<EventDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [repair, setRepair] = useState<Repair | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -34,6 +37,11 @@ export default function EventScreen({ id }: { id: string }) {
         else setError(b.error ?? b.degraded ?? "Event not found");
       })
       .catch(() => alive && setError("Couldn't load this event"));
+    // Crew progress card (frame 05): official field updates / assigned crew, if any.
+    fetch(`/api/repairs?ids=${id}`)
+      .then((r) => r.json() as Promise<{ data?: Repair[] }>)
+      .then((b) => alive && setRepair(b.data?.[0] ?? null))
+      .catch(() => {});
     return () => {
       alive = false;
     };
@@ -43,7 +51,8 @@ export default function EventScreen({ id }: { id: string }) {
   const st = ev ? (STATUS_STYLE[ev.status] ?? STATUS_STYLE.unknown) : null;
   const m = ev?.measurements ?? {};
   const total = typeof m.roadTotalWidthM === "number" ? m.roadTotalWidthM : m.roadTotalWidthM ? (m.roadTotalWidthM.min + m.roadTotalWidthM.max) / 2 : null;
-  const photo = ev?.photos.find((p) => p.annotatedUrl) ?? ev?.photos[0];
+  // Newest official progress photo first (the road has changed since); else the best annotated one.
+  const photo = (ev?.photos[0]?.source === "official" ? ev.photos[0] : undefined) ?? ev?.photos.find((p) => p.annotatedUrl) ?? ev?.photos[0];
   const src = ev?.sources;
   const newsOnly = Boolean(src && !src.reports && !src.official && src.news);
   const sourceText = src
@@ -100,7 +109,7 @@ export default function EventScreen({ id }: { id: string }) {
             {photo ? (
               <Link href={`/event/${ev.id}/photos`} className="relative block h-[168px] shrink-0 overflow-hidden rounded-[18px] bg-[#3D4245]">
                 {/* eslint-disable-next-line @next/next/no-img-element -- Supabase public URL */}
-                <img src={photo.annotatedUrl ?? photo.publicUrl ?? ""} alt={`AI-annotated photo: ${ev.summary ?? ""}`} className="size-full object-cover" />
+                <img src={photo.annotatedUrl ?? photo.publicUrl ?? ""} alt={`${photo.annotatedUrl ? "AI-annotated photo" : photo.source === "official" ? "Official progress photo" : "Photo"}: ${ev.summary ?? ""}`} className="size-full object-cover" />
                 <span className="absolute left-[10px] top-[10px] rounded-[8px] bg-black/50 px-[9px] py-[5px] text-[12px] font-bold text-white backdrop-blur-[10px]">
                   {st.word === "One lane" ? "One lane open" : st.word}
                 </span>
@@ -167,7 +176,8 @@ export default function EventScreen({ id }: { id: string }) {
               </div>
             )}
 
-            {/* TODO(phase-5): reopening predictor line · TODO(phase-4): crew progress card (/route/repairs) */}
+            {/* TODO(phase-5): reopening predictor line */}
+            {repair && <CrewCard r={repair} link={false} />}
 
             <div className="glass-card flex items-start gap-[10px] px-[14px] py-3">
               {newsOnly ? (

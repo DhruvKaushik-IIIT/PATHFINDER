@@ -7,6 +7,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import Toast from "@/components/glass/Toast";
+import { shrinkPhoto } from "@/lib/images/shrink";
 import { MAX_SECONDS, startRecording, type Recorder, type WavRecording } from "@/lib/audio/wavRecorder";
 
 import { LAST_REPORT_KEY } from "./storage";
@@ -147,23 +148,6 @@ export default function ReportScreen() {
     }
   }
 
-  /** Phone photos are 3–8 MB; Vercel functions accept ~4.5 MB. Resize to ≤1600 px JPEG first (the server resizes to 1280 anyway). */
-  async function shrink(file: File): Promise<Blob> {
-    try {
-      const bmp = await createImageBitmap(file, { imageOrientation: "from-image" });
-      const scale = Math.min(1, 1600 / Math.max(bmp.width, bmp.height));
-      const c = document.createElement("canvas");
-      c.width = Math.round(bmp.width * scale);
-      c.height = Math.round(bmp.height * scale);
-      c.getContext("2d")!.drawImage(bmp, 0, 0, c.width, c.height);
-      bmp.close();
-      const blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/jpeg", 0.9));
-      return blob ?? file;
-    } catch {
-      return file; // e.g. HEIC on a browser that can't decode it: let the server try
-    }
-  }
-
   function shoot() {
     const v = videoRef.current;
     if (camera !== "on" || !v || !v.videoWidth) {
@@ -289,7 +273,7 @@ export default function ReportScreen() {
             onChange={(e) => {
               const f = e.target.files?.[0];
               e.target.value = "";
-              if (f) void shrink(f).then(send);
+              if (f) void shrinkPhoto(f).then(send);
             }}
           />
         </div>

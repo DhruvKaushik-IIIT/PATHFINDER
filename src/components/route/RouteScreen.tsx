@@ -3,7 +3,7 @@
 // Frame 03 Route result (docs/design/glass-html/Route.dc.html). Two steps so it feels instant:
 // 1. GET /api/route → map, route line, code verdict (no AI, ~1 s)
 // 2. POST /api/route-check → the Route Check agent's verdict replaces it (5–30 s; cached 20 min)
-import { ChevronLeft, ChevronRight, CloudRain, Sparkles, Sun } from "lucide-react";
+import { ChevronLeft, ChevronRight, CloudRain, Sparkles, Sun, Wrench } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -17,6 +17,7 @@ import type { RoutePlan } from "@/lib/geo/routeTypes";
 import type { WatchedTrip } from "@/lib/watch/types";
 import RiskLayer from "@/components/map/RiskLayer";
 import { replayLabel, type RouteRisk } from "@/lib/risk/types";
+import { routeEventIds, type Repair } from "@/lib/repairs/types";
 import { checkedBy, departLabel, eventTitle, saveCheck, VERDICT_WORD, type CheckResult } from "./routeData";
 
 const MapView = dynamic(() => import("@/components/map/MapView"), {
@@ -37,6 +38,7 @@ export default function RouteScreen() {
   const [watchId, setWatchId] = useState<string | null>(null);
   const [watchBusy, setWatchBusy] = useState(false);
   const [risk, setRisk] = useState<RouteRisk | null>(null);
+  const [crewsAtWork, setCrewsAtWork] = useState(0);
 
   const from = params.get("from");
   const to = params.get("to");
@@ -93,6 +95,20 @@ export default function RouteScreen() {
       alive = false;
     };
   }, [from, to, fromName, toName, depart, query, replay]);
+
+  // Crews at work on this route's events (no AI) → "N repair crews working" link to frame 07.
+  const eventKey = plan ? routeEventIds(plan).join(",") : "";
+  useEffect(() => {
+    if (!eventKey) return setCrewsAtWork(0);
+    let alive = true;
+    fetch(`/api/repairs?ids=${eventKey}`)
+      .then((r) => r.json() as Promise<{ data: Repair[] }>)
+      .then((b) => alive && setCrewsAtWork(b.data.filter((x) => x.atWork).length))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [eventKey]);
 
   // Fit the map to the routes once both the plan and the map are ready (leave room for the sheet).
   const fittedFor = useRef<RoutePlan | null>(null);
@@ -299,7 +315,18 @@ export default function RouteScreen() {
               </div>
             )}
 
-            {/* TODO(phase-4): "N repair crews working on your route" link (/route/repairs) */}
+            {crewsAtWork > 0 && (
+              <Link
+                href={`/route/repairs?${query}`}
+                className="glass-card flex items-center gap-[10px] px-[14px] py-3 text-[15px] font-semibold text-link no-underline"
+              >
+                <Wrench size={17} strokeWidth={2.2} aria-hidden />
+                <span className="flex-1">
+                  {crewsAtWork} repair crew{crewsAtWork === 1 ? "" : "s"} working on your route
+                </span>
+                <ChevronRight size={15} strokeWidth={2.6} className="text-unknown" aria-hidden />
+              </Link>
+            )}
             {/* Rain risk (Risk Forecast v1): purple banner for moderate/high, a calm weather line otherwise */}
             {risk?.headline ? (
               <div role="note" className="flex items-start gap-[10px] rounded-[16px] bg-risk-bg px-[14px] py-3 text-risk-ink">

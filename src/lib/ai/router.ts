@@ -13,7 +13,10 @@ import { segmentImage, type SamResult } from "./sam.ts";
 import { ROUTE_CHECK_SYSTEM, routeCheckUserText } from "./prompts/routeCheck.ts";
 import { NEARBY_SYSTEM, nearbyUserText } from "./prompts/nearby.ts";
 import { NEWS_PARSE_SYSTEM, newsParseUserText, newsSearchPrompt } from "./prompts/news.ts";
-import { ClaimSet, jsonSchemaFormat, NearbySummary, NewsItems, parseJson, RouteVerdict, Verdict, type Claim } from "./schemas.ts";
+import { ADVISORY_SYSTEM, advisoryUserText } from "./prompts/advisory.ts";
+import { DISPATCH_SYSTEM, dispatchUserText } from "./prompts/dispatch.ts";
+import { Advisory, ClaimSet, DispatchProposal, jsonSchemaFormat, NearbySummary, NewsItems, parseJson, RouteVerdict, Verdict, type Claim } from "./schemas.ts";
+import { DISPATCH_TOOLS, runDispatchTool, type DispatchContext } from "./tools/dispatch.ts";
 import { ist, ROUTE_CHECK_TOOLS, runRouteCheckTool, type RouteCheckContext } from "./tools/routeCheck.ts";
 import { z } from "zod";
 import { transcribeWav } from "./voice.ts";
@@ -732,5 +735,60 @@ export function routeCheck(
     attempts,
     mock: () => ({ verdict: codeVerdict(), by: "mock", trace: [] }),
     lastResort: () => ({ verdict: codeVerdict(), by: "code", trace: [] }),
+  });
+}
+
+// ---------------------------------------------------------------- Command Centre (Phase 4)
+
+export interface DispatchOutput {
+  proposal: DispatchProposal | null;
+  by: Provider | "mock" | "code";
+  trace: string[];
+}
+
+/**
+ * Crew Dispatch agent (6.4): Meta Muse Wonder (medium effort) → Baseten Spark Open with the same tools.
+ * Last resort: null proposal → the caller shows the code plan. Vehicle-hours are recomputed in code.
+ */
+export function crewDispatch(ctx: DispatchContext, org: string): Promise<JobResult<DispatchOutput>> {
+  const user = dispatchUserText({ org, district: ctx.district.name, now: ist(new Date()) });
+  const attempt = (provider: Provider, model: string): Attempt<DispatchOutput> => ({
+    provider,
+    model,
+    kind: "agent",
+    run: async (c) => {
+      const { data, usage } = await agentLoop(c, provider, model, {
+        system: DISPATCH_SYSTEM,
+        user,
+        tools: DISPATCH_TOOLS,
+        exec: (name, args) => runDispatchTool(ctx, name, args),
+        submit: { name: "submit_plan", schema: DispatchProposal },
+        maxTurns: 6,
+        effort: "medium",
+      });
+      return { data: { proposal: data.data, by: provider, trace: data.trace }, usage };
+    },
+  });
+  return runJob<DispatchOutput>({
+    purpose: "crew_dispatch",
+    attempts: [attempt("meta", MODELS.wonder), attempt("baseten", MODELS.sparkOpen)],
+    mock: () => ({ proposal: null, by: "mock", trace: [] }),
+    lastResort: () => ({ proposal: null, by: "code", trace: [] }),
+  });
+}
+
+/** Verified event → public advisory EN + HI. Baseten → Meta Spark → template from code. */
+export function draftAdvisory(input: Parameters<typeof advisoryUserText>[0], template: () => Advisory): Promise<JobResult<Advisory>> {
+  const content: ChatContent = [{ type: "text", text: advisoryUserText(input) }];
+  const attempt = (provider: Provider, model: string): Attempt<Advisory> => ({
+    provider,
+    model,
+    run: (c) => chatJson(c, provider, model, { name: "advisory", schema: Advisory, system: ADVISORY_SYSTEM, content }),
+  });
+  return runJob<Advisory>({
+    purpose: "advisory_draft",
+    attempts: [attempt("baseten", MODELS.sparkOpen), attempt("meta", MODELS.spark)],
+    mock: template,
+    lastResort: template,
   });
 }
