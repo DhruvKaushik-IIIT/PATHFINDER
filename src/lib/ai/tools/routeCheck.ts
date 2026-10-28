@@ -228,6 +228,7 @@ export async function runRouteCheckTool(ctx: RouteCheckContext, name: string, ra
         confidence: e.confidence,
         lastConfirmedMinAgo: agoMin(e.lastConfirmedAt),
         reports: e.reports,
+        newsItems: e.news,
         summary: e.summary,
       }));
     }
