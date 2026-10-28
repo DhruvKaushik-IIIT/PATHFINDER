@@ -7,7 +7,10 @@ import Link from "next/link";
 import { useRef, useState } from "react";
 import type { MapRef } from "react-map-gl/maplibre";
 import Sheet from "@/components/glass/Sheet";
+import EventPeek from "@/components/map/EventPeek";
 import type { LatLng } from "@/components/map/MapView";
+import { useEvents } from "@/components/map/useEvents";
+import type { MapEvent } from "@/lib/events/types";
 
 // MapLibre needs `window` → client-only.
 const MapView = dynamic(() => import("@/components/map/MapView"), {
@@ -20,6 +23,8 @@ export default function HomeScreen() {
   const [me, setMe] = useState<LatLng | null>(null);
   const [showRoads, setShowRoads] = useState(true);
   const [locating, setLocating] = useState(false);
+  const { events, refresh } = useEvents(mapRef);
+  const [selected, setSelected] = useState<MapEvent | null>(null);
 
   function locate() {
     if (!("geolocation" in navigator)) return;
@@ -38,7 +43,21 @@ export default function HomeScreen() {
 
   return (
     <main className="fixed inset-0 overflow-hidden">
-      <MapView mapRef={mapRef} myLocation={me} showRoadLayer={showRoads} />
+      <MapView
+        mapRef={mapRef}
+        myLocation={me}
+        showRoadLayer={showRoads}
+        events={events}
+        selectedEventId={selected?.id ?? null}
+        onSelectEvent={setSelected}
+        onViewChange={refresh}
+      />
+
+      {selected && (
+        <div className="absolute inset-x-[14px] top-[214px] z-20 mx-auto max-w-[452px]">
+          <EventPeek event={selected} onClose={() => setSelected(null)} />
+        </div>
+      )}
 
       {/* top-left: profile */}
       <div className="absolute left-[14px] top-[56px] z-10">

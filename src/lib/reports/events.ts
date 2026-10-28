@@ -35,6 +35,8 @@ export interface EventResult {
   eventId: string | null;
   action: "created" | "merged" | "noted" | "none";
   reportStatus: "accepted" | "pending" | "rejected";
+  /** Reports on the event including this one (0 when no event). */
+  eventReports: number;
 }
 
 async function findOpenEvent(u: EventUpdate): Promise<EventRow | null> {
@@ -56,9 +58,17 @@ function reportConfidence(u: EventUpdate): number {
   return Math.min(0.95, base + (u.modelsAgreed >= 2 ? 0.1 : 0));
 }
 
+/** Scout points (shown on /report/done): first to report > confirming > unverified. */
+export function pointsFor(r: EventResult): number {
+  if (r.reportStatus === "rejected") return 0;
+  if (r.action === "created") return 25;
+  if (r.action === "merged") return 10;
+  return 5;
+}
+
 export async function applyToWorldState(u: EventUpdate): Promise<EventResult> {
   const { claim, verdict } = u;
-  if (verdict.verdict === "reject") return { eventId: null, action: "none", reportStatus: "rejected" };
+  if (verdict.verdict === "reject") return { eventId: null, action: "none", reportStatus: "rejected", eventReports: 0 };
 
   const type = verdict.correctedEventType ?? claim.eventType;
   const status = verdict.correctedStatus ?? claim.status;
@@ -82,7 +92,7 @@ export async function applyToWorldState(u: EventUpdate): Promise<EventResult> {
 
   if (!existing) {
     // A single unverified ("pending") report doesn't put a pin on everyone's map.
-    if (!accepted) return { eventId: null, action: "none", reportStatus: "pending" };
+    if (!accepted) return { eventId: null, action: "none", reportStatus: "pending", eventReports: 0 };
     const [ev] = await insert<{ id: string }>("events", {
       segment_id: u.segmentId,
       type,
@@ -101,7 +111,7 @@ export async function applyToWorldState(u: EventUpdate): Promise<EventResult> {
       models_agreed: u.modelsAgreed,
     });
     await timeline(ev!.id, `Reported: ${claim.summary}`);
-    return { eventId: ev!.id, action: "created", reportStatus: "accepted" };
+    return { eventId: ev!.id, action: "created", reportStatus: "accepted", eventReports: 1 };
   }
 
   const sources = { ...existing.sources, reports: (existing.sources?.reports ?? 0) + 1 };
@@ -109,7 +119,7 @@ export async function applyToWorldState(u: EventUpdate): Promise<EventResult> {
     // Ambiguous evidence: keep it on the record, don't move the status.
     await update("events", `id=eq.${existing.id}`, { sources });
     await timeline(existing.id, `Unconfirmed report: ${claim.summary}`);
-    return { eventId: existing.id, action: "noted", reportStatus: "pending" };
+    return { eventId: existing.id, action: "noted", reportStatus: "pending", eventReports: sources.reports };
   }
 
   const clears = type === "clear" || status === "open";
@@ -127,5 +137,5 @@ export async function applyToWorldState(u: EventUpdate): Promise<EventResult> {
     models_agreed: Math.max(existing.models_agreed ?? 0, u.modelsAgreed),
   });
   await timeline(existing.id, clears ? `Road reported clear again: ${claim.summary}` : `Confirmed: ${claim.summary}`);
-  return { eventId: existing.id, action: "merged", reportStatus: "accepted" };
+  return { eventId: existing.id, action: "merged", reportStatus: "accepted", eventReports: sources.reports };
 }

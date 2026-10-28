@@ -10,7 +10,7 @@ import type { Claim, Verdict } from "../ai/schemas.ts";
 import { insert, publicUrl, select, update, upload } from "../db/supabase.ts";
 import { snapToRoad } from "../geo/snap.ts";
 import { annotate } from "../images/annotate.ts";
-import { applyToWorldState, type EventResult } from "./events.ts";
+import { applyToWorldState, pointsFor, type EventResult } from "./events.ts";
 import { processPhoto, type PreparedPhoto } from "./processPhoto.ts";
 
 export interface SubmitInput {
@@ -26,6 +26,10 @@ export interface SubmitResult {
   photoId: string;
   eventId: string | null;
   eventAction: EventResult["action"];
+  eventReports: number;
+  points: number;
+  lat: number;
+  lng: number;
   reportStatus: EventResult["reportStatus"];
   publicUrl: string;
   annotatedUrl: string | null;
@@ -132,7 +136,7 @@ export async function submitReport(input: SubmitInput): Promise<SubmitResult> {
   }
   // TODO(phase-5): claims about OTHER places (atReportLocation=false, placeHint) go to the Investigator.
 
-  let ev: EventResult = { eventId: null, action: "none", reportStatus: "pending" };
+  let ev: EventResult = { eventId: null, action: "none", reportStatus: "pending", eventReports: 0 };
   if (here && verdict) {
     ev = await applyToWorldState({
       claim: here, verdict, verifiedBy: verifiedBy!, modelsAgreed,
@@ -163,7 +167,7 @@ export async function submitReport(input: SubmitInput): Promise<SubmitResult> {
   }
 
   await Promise.all([
-    update("reports", `id=eq.${id}`, { status: ev.reportStatus, event_id: ev.eventId }),
+    update("reports", `id=eq.${id}`, { status: ev.reportStatus, event_id: ev.eventId, points_awarded: pointsFor(ev) }),
     update("photos", `id=eq.${photoRow!.id}`, { event_id: ev.eventId, annotated_url: annotatedUrl }),
   ]);
   timings.total = Date.now() - t0;
@@ -173,6 +177,10 @@ export async function submitReport(input: SubmitInput): Promise<SubmitResult> {
     photoId: photoRow!.id,
     eventId: ev.eventId,
     eventAction: ev.action,
+    eventReports: ev.eventReports,
+    points: pointsFor(ev),
+    lat,
+    lng,
     reportStatus: ev.reportStatus,
     publicUrl: pubUrl,
     annotatedUrl,
