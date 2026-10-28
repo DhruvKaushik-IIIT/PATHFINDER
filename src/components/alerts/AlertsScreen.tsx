@@ -65,6 +65,12 @@ export default function AlertsScreen() {
     else setToast("Couldn't stop watching — try again");
   }
 
+  // "Not now" on a scout request: drop the card, tell the server (it marks that alert read).
+  async function notNow(a: Alert) {
+    setAlerts((list) => (list ?? []).map((x) => (x.id === a.id ? { ...x, read: true, data: { ...x.data, url: undefined } } : x)));
+    if (a.data?.requestId) fetch("/api/scout/respond", { method: "POST", body: JSON.stringify({ requestId: a.data.requestId, action: "dismiss" }) }).catch(() => {});
+  }
+
   // Unread alerts (max 3) get the big card; the rest go in the compact list.
   const fresh = (alerts ?? []).filter((a) => !a.read).slice(0, 3);
   const earlier = (alerts ?? []).filter((a) => !fresh.includes(a));
@@ -124,7 +130,25 @@ export default function AlertsScreen() {
                       {a.data.hi}
                     </span>
                   )}
-                  {a.data?.url && (
+                  {a.kind === "scout_request" ? (
+                    <div className="flex gap-2">
+                      {a.data?.url && (
+                        <Link
+                          href={a.data.url}
+                          className="flex h-11 flex-1 items-center justify-center rounded-[12px] bg-accent-tint text-[16px] font-semibold text-accent-tint-ink no-underline"
+                        >
+                          Share photo
+                        </Link>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => notNow(a)}
+                        className="flex h-11 flex-1 items-center justify-center rounded-[12px] bg-[rgba(118,118,128,0.14)] text-[16px] font-medium text-ink"
+                      >
+                        Not now
+                      </button>
+                    </div>
+                  ) : a.data?.url && (
                     <Link
                       href={a.data.url}
                       className="flex h-11 items-center justify-center rounded-[12px] bg-accent text-[16px] font-semibold text-white no-underline"
@@ -196,7 +220,6 @@ export default function AlertsScreen() {
           )}
 
           <p className="m-0 text-center text-[12px] text-ink-3">Road Watch re-checks when a road on your route changes · verify with official sources</p>
-          {/* TODO(phase-5): Scout request cards (Share photo / Not now) */}
         </div>
       </Sheet>
     </main>

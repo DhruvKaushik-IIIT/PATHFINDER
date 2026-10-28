@@ -132,6 +132,9 @@ export default function ReportScreen() {
     form.append("lat", String(loc.lat));
     form.append("lng", String(loc.lng));
     if (voice) form.append("voice", voice.blob, "note.wav");
+    // Answering a scout request (/report?scout=<id> from the Alerts card): bonus points + request fulfilled.
+    const scout = new URLSearchParams(window.location.search).get("scout");
+    if (scout) form.append("scout", scout);
     try {
       const res = await fetch("/api/reports", { method: "POST", body: form });
       const body = (await res.json()) as { ok: boolean; error?: string };

@@ -4,6 +4,7 @@
 import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { hasDb } from "@/lib/db/supabase.ts";
+import { ensureUserId } from "@/lib/me.ts";
 import { preparePhoto, processPhoto } from "@/lib/reports/processPhoto.ts";
 import { findDuplicate, submitReport } from "@/lib/reports/submit.ts";
 import { roadWatchAfterChange } from "@/lib/watch/roadWatch.ts";
@@ -20,6 +21,7 @@ const Input = z.object({
   lat: z.coerce.number().min(26).max(35),
   lng: z.coerce.number().min(72).max(82),
   text: z.string().trim().max(1000).optional(),
+  scout: z.uuid().optional(),
 });
 
 const bad = (error: string, status = 400) => NextResponse.json({ ok: false, error }, { status });
@@ -31,7 +33,7 @@ export async function POST(req: Request) {
   } catch {
     return bad("expected multipart/form-data");
   }
-  const parsed = Input.safeParse({ lat: form.get("lat"), lng: form.get("lng"), text: form.get("text") ?? undefined });
+  const parsed = Input.safeParse({ lat: form.get("lat"), lng: form.get("lng"), text: form.get("text") ?? undefined, scout: form.get("scout") ?? undefined });
   if (!parsed.success) return bad(`invalid input: ${parsed.error.issues.map((i) => i.path.join(".")).join(", ")}`);
   const photo = form.get("photo");
   if (!(photo instanceof File) || !photo.type.startsWith("image/")) return bad("photo (image file) is required");
@@ -68,8 +70,11 @@ export async function POST(req: Request) {
         },
       });
     }
-    const { lat, lng, text } = parsed.data;
+    const { lat, lng, text, scout } = parsed.data;
+    const userId = await ensureUserId();
     const data = await submitReport({
+      userId,
+      scoutRequestId: scout ?? null,
       photo: prepared,
       lat,
       lng,

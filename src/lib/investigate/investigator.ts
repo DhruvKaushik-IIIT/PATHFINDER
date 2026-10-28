@@ -7,6 +7,7 @@ import { groundedSearch, investigate } from "../ai/router.ts";
 import { ist } from "../ai/tools/routeCheck.ts";
 import { runInvestigateTool, type InvestigatedEvent, type InvestigateContext } from "../ai/tools/investigate.ts";
 import { insert, select, update } from "../db/supabase.ts";
+import { dispatchRequest, type ScoutRequest } from "../scout/requests.ts";
 import { eventTitle, type InvestigationSummary } from "../events/types.ts";
 
 const STALE_H = { fast: 4, slow: 8 }; // snow/ice/traffic change by the hour; slides and damage slower
@@ -145,6 +146,10 @@ export async function investigateEvent(id: string, opts: { force?: boolean } = {
     is_demo: ev.is_demo ?? false,
   });
   if (after !== ev.confidence) await update("events", `id=eq.${ev.id}`, { confidence: after });
+  if (ctx.scoutRequestId) {
+    const [req] = await select<ScoutRequest>("scout_requests", `select=id,segment_id,question,demand_count,sent_to,fulfilled_by_report_id,created_at,is_demo&id=eq.${ctx.scoutRequestId}`);
+    if (req) await dispatchRequest(req).catch((err: Error) => console.warn("[investigate] scout dispatch failed:", err.message));
+  }
 
   return { eventId: id, ran: true, reason, note, trace: res.data.trace, ...(res.degraded && { degraded: res.degraded }) };
 }

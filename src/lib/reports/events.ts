@@ -62,8 +62,9 @@ function reportConfidence(u: EventUpdate): number {
 }
 
 /** Scout points (shown on /report/done): first to report > confirming > unverified. */
-export function pointsFor(r: EventResult): number {
-  if (r.reportStatus === "rejected") return 0;
+export function pointsFor(r: EventResult, verdict?: Verdict | null): number {
+  // "−10 confident fake" (frame 12): only when the verifier was sure; a doubtful reject costs nothing.
+  if (r.reportStatus === "rejected") return verdict && verdict.verdict === "reject" && verdict.confidence >= 0.8 ? -10 : 0;
   if (r.action === "created") return 25;
   if (r.action === "merged") return 10;
   return 5;

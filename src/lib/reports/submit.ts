@@ -12,6 +12,8 @@ import { snapToRoad } from "../geo/snap.ts";
 import { annotate } from "../images/annotate.ts";
 import { applyToWorldState, pointsFor, type EventResult } from "./events.ts";
 import { noteMentions } from "./mentions.ts";
+import { creditUser } from "../me.ts";
+import { fulfilScoutRequest } from "../scout/requests.ts";
 import { processPhoto, type PreparedPhoto } from "./processPhoto.ts";
 
 export interface SubmitInput {
@@ -20,6 +22,10 @@ export interface SubmitInput {
   lng: number;
   text: string | null;
   voiceWav: Buffer | null;
+  /** Anonymous device user (pf_uid) — gets the points. */
+  userId?: string | null;
+  /** Set when this photo answers a scout request (/report?scout=…): bonus points + request fulfilled. */
+  scoutRequestId?: string | null;
 }
 
 export interface SubmitResult {
@@ -29,6 +35,8 @@ export interface SubmitResult {
   eventAction: EventResult["action"];
   eventReports: number;
   points: number;
+  /** Extra points for answering a scout request (0 otherwise). */
+  scoutBonus: number;
   lat: number;
   lng: number;
   reportStatus: EventResult["reportStatus"];
@@ -103,6 +111,7 @@ export async function submitReport(input: SubmitInput): Promise<SubmitResult> {
 
   // ---- persist
   const [report] = await insert<{ id: string }>("reports", {
+    user_id: input.userId ?? null,
     lat, lng, text,
     segment_id: snap.segment?.id ?? null,
     media_type: "photo",
@@ -129,7 +138,7 @@ export async function submitReport(input: SubmitInput): Promise<SubmitResult> {
     sam_masks: p.sam,
     measurements: p.measurements,
     faces_blurred: p.facesBlurred,
-    source: "traveller",
+    source: input.scoutRequestId ? "scout" : "traveller",
   });
   if (claims.length) {
     await insert(
@@ -173,8 +182,11 @@ export async function submitReport(input: SubmitInput): Promise<SubmitResult> {
     }
   }
 
+  const scoutBonus = input.scoutRequestId && ev.reportStatus !== "rejected" ? await fulfilScoutRequest(input.scoutRequestId, id) : 0;
+  const points = pointsFor(ev, verdict) + scoutBonus;
+  if (input.userId) await creditUser(input.userId, points, { lat, lng }).catch((err: Error) => console.warn("[reports] points failed:", err.message));
   await Promise.all([
-    update("reports", `id=eq.${id}`, { status: ev.reportStatus, event_id: ev.eventId, points_awarded: pointsFor(ev) }),
+    update("reports", `id=eq.${id}`, { status: ev.reportStatus, event_id: ev.eventId, points_awarded: points }),
     update("photos", `id=eq.${photoRow!.id}`, { event_id: ev.eventId, annotated_url: annotatedUrl }),
   ]);
   timings.total = Date.now() - t0;
@@ -185,7 +197,8 @@ export async function submitReport(input: SubmitInput): Promise<SubmitResult> {
     eventId: ev.eventId,
     eventAction: ev.action,
     eventReports: ev.eventReports,
-    points: pointsFor(ev),
+    points,
+    scoutBonus,
     lat,
     lng,
     reportStatus: ev.reportStatus,

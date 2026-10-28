@@ -31,7 +31,8 @@
     "create-official": "node --env-file-if-exists=.env.local scripts/create-official.ts",
     "test:dispatch": "node --env-file-if-exists=.env.local scripts/test-dispatch.ts",
     "test:reopening": "node --env-file-if-exists=.env.local scripts/test-reopening.ts",
-    "test:investigator": "node --env-file-if-exists=.env.local scripts/test-investigator.ts"
+    "test:investigator": "node --env-file-if-exists=.env.local scripts/test-investigator.ts",
+    "test:scout": "node --env-file-if-exists=.env.local scripts/test-scout.ts"
   },
   "dependencies": {
     "@meta-sam/parser": "^0.1.0",

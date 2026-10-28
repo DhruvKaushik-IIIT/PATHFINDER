@@ -2,7 +2,8 @@
 // official updates, the reopening predictor and Open-Meteo; one grounded web search per run.
 import type OpenAI from "openai";
 import { z } from "zod";
-import { insert, select, update } from "../../db/supabase.ts";
+import { select } from "../../db/supabase.ts";
+import { ensureRequest } from "../../scout/requests.ts";
 import { reopeningFor } from "../../events/reopening.ts";
 import { weatherAt } from "../../weather.ts";
 import { Investigation } from "../schemas.ts";
@@ -191,20 +192,9 @@ export async function runInvestigateTool(ctx: InvestigateContext, name: string, 
         if (!ev.segment_id) return { error: "this event isn't on a mapped road segment — a scout request can't be routed" };
         const question = String(args.question ?? "").slice(0, 160);
         if (!question.trim()) return { error: "empty question" };
-        // One open request per segment: repeat asks raise its demand instead of a new row.
-        const since = new Date(Date.now() - 6 * 3_600_000).toISOString();
-        const [open] = await select<{ id: string; demand_count: number }>(
-          "scout_requests",
-          `select=id,demand_count&segment_id=eq.${encodeURIComponent(ev.segment_id)}&fulfilled_by_report_id=is.null&created_at=gte.${since}&limit=1`,
-        );
-        if (open) {
-          await update("scout_requests", `id=eq.${open.id}`, { demand_count: open.demand_count + 1 });
-          ctx.scoutRequestId = open.id;
-        } else {
-          const [row] = await insert<{ id: string }>("scout_requests", { segment_id: ev.segment_id, question, demand_count: 1, is_demo: ev.is_demo ?? false });
-          ctx.scoutRequestId = row!.id;
-        }
-        // TODO(phase-5B): send it to opted-in, stationary scouts nearby (alerts kind scout_request).
+        const req = await ensureRequest(ev.segment_id, question, { isDemo: ev.is_demo ?? false });
+        ctx.scoutRequestId = req.id;
+        // Sent to nearby stationary scouts by the Investigator once it finishes (scout/requests.ts).
         return { ok: true, note: "request queued for nearby scouts" };
       }
       default:

@@ -1,6 +1,7 @@
 // Server-only: public advisory (frame 14b). Draft EN + HI from the verified event (Baseten → Meta Spark →
 // template), count who it reaches (travellers watching a trip through this spot), and Publish: one alert
 // per watching device + a timeline item on the event. Officials can only advise inside their district.
+import { watchers } from "../watch/watchers.ts";
 import { draftAdvisory } from "../ai/router.ts";
 import type { Advisory } from "../ai/schemas.ts";
 import { ist } from "../ai/tools/routeCheck.ts";
@@ -66,22 +67,6 @@ async function loadEvent(official: Official, eventId: string): Promise<{ row: Ev
   if (!row || row.resolved_at || kmBetween(row, official.district) > official.district.radiusKm) return null;
   const [crew] = await select<{ name: string; org: string }>("crews", `select=name,org&current_event_id=eq.${eventId}&limit=1`);
   return { row, crew: crew ? `${crew.name} (${crew.org})` : null };
-}
-
-/** Active watched trips that pass this event (listed in their snapshot, or their route box around it). */
-async function watchers(e: { id: string; lat: number; lng: number }): Promise<{ userIds: string[]; trips: number }> {
-  const rows = await select<{ user_id: string; route_cache: { bbox?: [number, number, number, number]; events?: { id: string }[] } | null }>(
-    "watched_trips",
-    "select=user_id,route_cache&active=is.true&limit=2000",
-  );
-  const pad = 0.05;
-  const hit = rows.filter((r) => {
-    const c = r.route_cache;
-    if (c?.events?.some((x) => x.id === e.id)) return true;
-    const b = c?.bbox;
-    return Boolean(b && e.lng >= b[0] - pad && e.lng <= b[2] + pad && e.lat >= b[1] - pad && e.lat <= b[3] + pad);
-  });
-  return { userIds: [...new Set(hit.map((r) => r.user_id))], trips: hit.length };
 }
 
 function passableText(p: EventRow["passable"]): string {
