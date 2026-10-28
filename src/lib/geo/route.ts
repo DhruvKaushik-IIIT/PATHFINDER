@@ -220,8 +220,23 @@ async function detoursAround(blocked: Omit<RouteOption, "recommended" | "verdict
   return found.flat().filter((r) => r.distanceM < blocked.distanceKm * 1000 * 1.7);
 }
 
+// /route asks for the plan (GET /api/route), then for the agent (POST /api/route-check) which needs the
+// same plan: keep it for 3 minutes so the second request doesn't rebuild it (~4 s on long trips).
+const PLAN_TTL_MS = 3 * 60_000;
+const planCache = new Map<string, { at: number; plan: RoutePlan & { degraded?: string } }>();
+
 /** Throws only if routing itself fails (the caller degrades); events/towns degrade to empty. */
 export async function planRoute(from: NamedPoint, to: NamedPoint, departAt: Date): Promise<RoutePlan & { degraded?: string }> {
+  const key = `${[from.lat, from.lng, to.lat, to.lng].map((x) => x.toFixed(4)).join(",")}|${from.name}|${to.name}|${Math.floor(departAt.getTime() / 300_000)}`;
+  const hit = planCache.get(key);
+  if (hit && Date.now() - hit.at < PLAN_TTL_MS) return hit.plan;
+  const plan = await buildPlan(from, to, departAt);
+  if (planCache.size > 100) planCache.delete(planCache.keys().next().value!);
+  if (!plan.degraded) planCache.set(key, { at: Date.now(), plan });
+  return plan;
+}
+
+async function buildPlan(from: NamedPoint, to: NamedPoint, departAt: Date): Promise<RoutePlan & { degraded?: string }> {
   const raw = await osrmRoutes(from, to);
   const all = raw.flatMap((r) => r.coordinates);
   // Wide enough (~30 km) that a detour around a closure still sees the events on its roads.

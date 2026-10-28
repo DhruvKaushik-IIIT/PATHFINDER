@@ -14,7 +14,6 @@ import type { LatLng } from "@/components/map/MapView";
 import { useEvents } from "@/components/map/useEvents";
 import type { MapEvent } from "@/lib/events/types";
 import type { Place } from "@/lib/geo/placeTypes";
-import type { RoutePlan } from "@/lib/geo/routeTypes";
 
 // MapLibre needs `window` → client-only.
 const MapView = dynamic(() => import("@/components/map/MapView"), {
@@ -31,30 +30,12 @@ export default function HomeScreen() {
   const [selected, setSelected] = useState<MapEvent | null>(null);
   const [searching, setSearching] = useState(false);
   const [picked, setPicked] = useState<Place | null>(null);
-  const [plan, setPlan] = useState<RoutePlan | null>(null);
   const onSearchActive = useCallback((active: boolean) => setSearching(active), []);
 
   function pick(p: Place) {
     setPicked(p);
-    setPlan(null);
     setSelected(null);
     mapRef.current?.flyTo({ center: [p.lng, p.lat], zoom: Math.max(mapRef.current.getZoom(), 10) });
-  }
-
-  function showRoute(next: RoutePlan | null) {
-    setPlan(next);
-    const coords = next?.routes.flatMap((r) => r.geometry.coordinates);
-    if (!coords?.length) return;
-    const xs = coords.map((c) => c[0]!);
-    const ys = coords.map((c) => c[1]!);
-    // Leave room for the sheet at the bottom and the buttons at the top.
-    mapRef.current?.fitBounds(
-      [
-        [Math.min(...xs), Math.min(...ys)],
-        [Math.max(...xs), Math.max(...ys)],
-      ],
-      { padding: { top: 120, bottom: 420, left: 40, right: 70 }, duration: 800 },
-    );
   }
 
   function locate() {
@@ -82,7 +63,6 @@ export default function HomeScreen() {
         selectedEventId={selected?.id ?? null}
         onSelectEvent={setSelected}
         onViewChange={refresh}
-        routes={plan?.routes.map((r) => r.geometry) ?? []}
       >
         {picked && (
           <Marker latitude={picked.lat} longitude={picked.lng} anchor="bottom">
@@ -141,11 +121,7 @@ export default function HomeScreen() {
               key={picked.id}
               place={picked}
               origin={me ? { name: "Your location", lat: me.latitude, lng: me.longitude, isMe: true } : { name: "Mandi", lat: 31.708, lng: 76.932, isMe: false }}
-              onClose={() => {
-                setPicked(null);
-                setPlan(null);
-              }}
-              onRoute={showRoute}
+              onClose={() => setPicked(null)}
             />
           )}
 
