@@ -834,3 +834,33 @@ export function investigate(ctx: InvestigateContext, reason: string): Promise<Jo
     lastResort: () => ({ findings: null, by: "code", trace: [] }),
   });
 }
+
+export const IMAGE_COST = 0.01; // Muse Image per image (5.4)
+
+/** Alert-card illustration (Muse Image via the Responses API, cookbook 05/01). null → the caller draws one in code. */
+export function alertArt(prompt: string): Promise<JobResult<Buffer | null>> {
+  const model = MODELS.image;
+  return runJob<Buffer | null>({
+    purpose: "alert_art",
+    attempts: [
+      {
+        provider: "meta",
+        model,
+        kind: "agent", // image renders take longer than a text call
+        run: async (c) => {
+          const r = await c.responses.create({ model, input: prompt });
+          const usage: Usage = {
+            inputTokens: r.usage?.input_tokens ?? 0,
+            cachedInputTokens: r.usage?.input_tokens_details?.cached_tokens ?? 0,
+            outputTokens: r.usage?.output_tokens ?? 0,
+          };
+          const item = r.output.find((i) => i.type === "image_generation_call") as { result?: string | null } | undefined;
+          if (!item?.result) throw new InvalidOutputError("no image in the response", usage);
+          return { data: Buffer.from(item.result, "base64"), usage, costUsd: IMAGE_COST };
+        },
+      },
+    ],
+    mock: () => null,
+    lastResort: () => null,
+  });
+}

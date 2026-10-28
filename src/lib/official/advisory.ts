@@ -1,6 +1,8 @@
 // Server-only: public advisory (frame 14b). Draft EN + HI from the verified event (Baseten → Meta Spark →
 // template), count who it reaches (travellers watching a trip through this spot), and Publish: one alert
 // per watching device + a timeline item on the event. Officials can only advise inside their district.
+import { after } from "next/server";
+import { ensureArt } from "../share/card.ts";
 import { watchers } from "../watch/watchers.ts";
 import { draftAdvisory } from "../ai/router.ts";
 import type { Advisory } from "../ai/schemas.ts";
@@ -156,6 +158,7 @@ export async function publishAdvisory(official: Official, eventId: string, en: s
     data: { advisory: true, hi, sent: w.userIds.length, by: official.userId },
     is_demo: official.isDemo,
   });
-  // TODO(phase-5): also trigger the Muse Image share card for this advisory (/share/[eventId]).
+  // Warm the Muse Image illustration for this event's share card (/share/[eventId]) once the reply is sent.
+  after(() => ensureArt(row.type, row.status).then(() => undefined, (err: Error) => console.warn("[advisory] share art failed:", err.message)));
   return { ok: true, sent: w.userIds.length };
 }

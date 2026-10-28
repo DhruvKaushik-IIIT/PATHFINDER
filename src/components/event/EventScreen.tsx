@@ -2,7 +2,7 @@
 
 // Frame 05 Disruption detail (docs/design/glass-html/Disruption.dc.html): tall sheet over the map.
 // Big numbers first (stat tiles), evidence below (photo, sources, timeline). Every number is "~".
-import { Check, CircleHelp, Clock, Image as ImageIcon, Newspaper, ScanSearch, ShieldCheck, TrendingUp, X } from "lucide-react";
+import { Check, CircleHelp, Clock, Image as ImageIcon, Newspaper, ScanSearch, Share2, ShieldCheck, TrendingUp, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -223,7 +223,12 @@ export default function EventScreen({ id }: { id: string }) {
               </div>
             )}
 
-            {/* TODO(phase-5): Share alert card (Muse Image) */}
+            <Link
+              href={`/share/${ev.id}`}
+              className="flex min-h-[48px] shrink-0 items-center justify-center gap-2 rounded-[14px] bg-accent text-[16px] font-semibold text-white no-underline"
+            >
+              <Share2 size={18} aria-hidden /> Share alert card
+            </Link>
             <p className="mt-auto text-center text-[12px] text-ink-2">Estimates from photos and reports · verify with official sources</p>
           </>
         )}
