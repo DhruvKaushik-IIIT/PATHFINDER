@@ -18,6 +18,7 @@
     "test:sam": "node --env-file-if-exists=.env.local scripts/test-sam.ts",
     "test:voice": "node --env-file-if-exists=.env.local scripts/test-voice.ts",
     "fetch-roads": "node --env-file-if-exists=.env.local scripts/fetch-roads.ts",
+    "fetch-places": "node --env-file-if-exists=.env.local scripts/fetch-places.ts",
     "load-segments": "node --env-file-if-exists=.env.local scripts/load-segments.ts"
   },
   "dependencies": {

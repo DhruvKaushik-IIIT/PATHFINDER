@@ -1,4 +1,4 @@
-// Phase 0: load data/segments.geojson + data/places.json into Supabase (tables from
+// Phase 0: load data/segments.geojson + data/places.json (from pnpm fetch-places) into Supabase (tables from
 // supabase/migrations/0001_road_segments_places.sql). Goes over HTTPS (PostgREST, service role)
 // because cloud sessions can't open raw Postgres connections. Upserts on id → safe to re-run.
 // Then sanity-checks segments_in_bbox() around Mandi.
