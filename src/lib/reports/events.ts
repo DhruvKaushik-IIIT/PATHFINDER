@@ -5,9 +5,15 @@
 import type { Claim, Verdict } from "../ai/schemas.ts";
 import { debrisVolumeM3, type Range } from "../clearing/estimate.ts";
 import { insert, select, update } from "../db/supabase.ts";
+import type { VerificationRecord } from "../verification/types.ts";
 
 const MERGE_WINDOW_H = 24;
 const NEAR_DEG = 0.003; // ~300 m box when the report could not be snapped to a segment
+// Time-consistency (Phase 5 stretch): an old photo can't say what the road is like NOW, and a
+// contradicting report minutes after a confirmation doesn't flip the status unless it is more certain.
+export const OLD_PHOTO_H = 6;
+const FLIP_WINDOW_MIN = 30;
+const ago = (h: number) => (h < 48 ? `~${Math.round(h)} h` : `~${Math.round(h / 24)} days`);
 
 export interface EventRow {
   id: string;
@@ -17,6 +23,7 @@ export interface EventRow {
   confidence: number;
   sources: { reports: number; official: number; news: number; notices: number };
   models_agreed: number | null;
+  last_confirmed_at: string;
 }
 
 export interface EventUpdate {
@@ -30,6 +37,10 @@ export interface EventUpdate {
   lng: number;
   reportId: string;
   photoUrl: string | null;
+  /** Who wrote / who checked the claim (dual-model verification), stored on the timeline item. */
+  verification?: VerificationRecord | null;
+  /** Photo taken this many hours before it was sent (library pick); > OLD_PHOTO_H → history only. */
+  photoAgeH?: number | null;
   /** SAM's own numbers for the photo (road width, etc.), merged under the claim's. */
   sam?: { roadTotalWidthM?: Range; blockedLengthM?: Range; blockedPct?: Range } | null;
 }
@@ -40,11 +51,13 @@ export interface EventResult {
   reportStatus: "accepted" | "pending" | "rejected";
   /** Reports on the event including this one (0 when no event). */
   eventReports: number;
+  /** Why a verified report didn't change the road's status (old photo / conflicts with a fresh confirmation). */
+  timeCheck?: string;
 }
 
 async function findOpenEvent(u: EventUpdate): Promise<EventRow | null> {
   const since = new Date(Date.now() - MERGE_WINDOW_H * 3_600_000).toISOString();
-  const cols = "id,segment_id,type,status,confidence,sources,models_agreed";
+  const cols = "id,segment_id,type,status,confidence,sources,models_agreed,last_confirmed_at";
   const where = u.segmentId
     ? `segment_id=eq.${encodeURIComponent(u.segmentId)}`
     : `lat=gte.${u.lat - NEAR_DEG}&lat=lte.${u.lat + NEAR_DEG}&lng=gte.${u.lng - NEAR_DEG}&lng=lte.${u.lng + NEAR_DEG}`;
@@ -101,8 +114,19 @@ export async function applyToWorldState(u: EventUpdate): Promise<EventResult> {
         reportId: u.reportId, photoUrl: u.photoUrl, status, type,
         verdict: verdict.verdict, verifiedBy: u.verifiedBy, modelsAgreed: u.modelsAgreed,
         reasoning: verdict.reasoning,
+        ...(u.verification && { verification: u.verification }),
       },
     });
+
+  // Old photo (library pick): evidence of what WAS there, never the current state.
+  if (u.photoAgeH != null && u.photoAgeH > OLD_PHOTO_H) {
+    const note = `Photo taken ${ago(u.photoAgeH)} ago — kept as history, not as the road's current state`;
+    if (!existing) return { eventId: null, action: "none", reportStatus: "pending", eventReports: 0, timeCheck: note };
+    const sources = { ...existing.sources, reports: (existing.sources?.reports ?? 0) + 1 };
+    await update("events", `id=eq.${existing.id}`, { sources });
+    await timeline(existing.id, `Older photo (taken ${ago(u.photoAgeH)} ago): ${claim.summary}`);
+    return { eventId: existing.id, action: "noted", reportStatus: "pending", eventReports: sources.reports, timeCheck: note };
+  }
 
   if (!existing) {
     // A single unverified ("pending") report doesn't put a pin on everyone's map.
@@ -134,6 +158,17 @@ export async function applyToWorldState(u: EventUpdate): Promise<EventResult> {
     await update("events", `id=eq.${existing.id}`, { sources });
     await timeline(existing.id, `Unconfirmed report: ${claim.summary}`);
     return { eventId: existing.id, action: "noted", reportStatus: "pending", eventReports: sources.reports };
+  }
+
+  // Flip-flop guard: the same spot confirmed as something else minutes ago, and this report is less
+  // certain → keep the status, put the conflict on the record (the Investigator reads it).
+  const newStatus = type === "clear" ? "open" : status;
+  const minsSince = (Date.now() - new Date(existing.last_confirmed_at).getTime()) / 60_000;
+  if (newStatus !== existing.status && minsSince < FLIP_WINDOW_MIN && conf < existing.confidence) {
+    const note = `Conflicts with "${existing.status.replace("_", " ")}" confirmed ${Math.max(1, Math.round(minsSince))} min ago — status kept until another report or the Investigator settles it`;
+    await update("events", `id=eq.${existing.id}`, { sources });
+    await timeline(existing.id, `Conflicting report (says ${newStatus.replace("_", " ")}): ${claim.summary} · status kept`);
+    return { eventId: existing.id, action: "noted", reportStatus: "pending", eventReports: sources.reports, timeCheck: note };
   }
 
   const clears = type === "clear" || status === "open";

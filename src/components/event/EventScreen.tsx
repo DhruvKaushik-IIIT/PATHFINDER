@@ -11,6 +11,7 @@ import { approxRange, clearWindow } from "@/lib/events/format";
 import { ago, STATUS_STYLE, type EventDetail, type InvestigationSummary } from "@/lib/events/types";
 import { eventTitle } from "@/components/route/routeData";
 import CrewCard from "@/components/repairs/CrewCard";
+import ModelChecks from "@/components/verification/ModelChecks";
 import type { Repair } from "@/lib/repairs/types";
 
 const MapView = dynamic(() => import("@/components/map/MapView"), {
@@ -189,11 +190,12 @@ export default function EventScreen({ id }: { id: string }) {
               ) : (
                 <ShieldCheck size={20} className="mt-px shrink-0 text-open" aria-hidden />
               )}
-              <span className="flex flex-col gap-0.5">
+              <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="text-[15px] font-semibold">
                   {newsOnly ? "From news reports · not yet confirmed" : "Verified"} · {Math.round(ev.confidence * 100)}% confidence
                 </span>
                 {sourceText && <span className="text-[12px] text-ink-2">{sourceText}</span>}
+                {ev.verification?.latest && <ModelChecks v={ev.verification} />}
               </span>
             </div>
 

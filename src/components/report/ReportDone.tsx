@@ -11,6 +11,8 @@ import Toast from "@/components/glass/Toast";
 import { useEvents } from "@/components/map/useEvents";
 import { TYPE_WORD } from "@/lib/events/types";
 import { LAST_REPORT_KEY } from "./storage";
+import { checkerSays } from "@/components/verification/ModelChecks";
+import { MODEL_NAME, type VerificationRecord } from "@/lib/verification/types";
 
 const MapView = dynamic(() => import("@/components/map/MapView"), {
   ssr: false,
@@ -31,6 +33,8 @@ interface Result {
   claims: { eventType: string; status: string; measurements: { blockedPct: { min: number; max: number } | null } }[];
   verdict: { confidence: number; correctedEventType: string | null; correctedStatus: string | null } | null;
   modelsAgreed: number;
+  verification?: VerificationRecord | null;
+  timeCheck?: string | null;
   transcript: string | null;
 }
 
@@ -135,15 +139,25 @@ export default function ReportDone() {
                 ? `Now on the map for travellers${road ? ` on ${road}` : ""}`
                 : rejected
                   ? "It doesn't look like a road condition — try another angle"
-                  : "We'll add it once another report or the AI confirms it"}
+                  : (result.timeCheck ?? "We'll add it once another report or the AI confirms it")}
             </span>
           </span>
         </div>
 
         <div className="glass-card px-[14px] py-1">
           <Row label="AI found" value={aiFound(result)} />
-          {result.modelsAgreed >= 2 && result.verdict && (
-            <Row label="Checked by" value={`2 AI models agree · ${Math.round(result.verdict.confidence * 100)}%`} />
+          {result.verification ? (
+            <Row
+              label="Checked by"
+              value={
+                result.verification.twoModels
+                  ? `${MODEL_NAME[result.verification.claimBy]} + ${MODEL_NAME[result.verification.verifiedBy]}: ${result.modelsAgreed >= 2 ? `agree · ${Math.round(result.verification.confidence * 100)}%` : checkerSays(result.verification)}`
+                  : `${MODEL_NAME[result.verification.verifiedBy]} only · ${checkerSays(result.verification)}`
+              }
+            />
+          ) : (
+            result.modelsAgreed >= 2 &&
+            result.verdict && <Row label="Checked by" value={`2 AI models agree · ${Math.round(result.verdict.confidence * 100)}%`} />
           )}
           <Row
             label="Matched with"

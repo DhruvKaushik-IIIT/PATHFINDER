@@ -8,6 +8,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import Toast from "@/components/glass/Toast";
 import { shrinkPhoto } from "@/lib/images/shrink";
+import { takenAt } from "@/lib/images/takenAt";
 import { MAX_SECONDS, startRecording, type Recorder, type WavRecording } from "@/lib/audio/wavRecorder";
 
 import { LAST_REPORT_KEY } from "./storage";
@@ -121,7 +122,7 @@ export default function ReportScreen() {
 
   useEffect(() => () => recorder.current?.cancel(), []);
 
-  async function send(photo: Blob) {
+  async function send(photo: Blob, taken: string | null = null) {
     if (!loc) {
       setToast("We need your location to place the report on the road");
       return;
@@ -135,6 +136,7 @@ export default function ReportScreen() {
     // Answering a scout request (/report?scout=<id> from the Alerts card): bonus points + request fulfilled.
     const scout = new URLSearchParams(window.location.search).get("scout");
     if (scout) form.append("scout", scout);
+    if (taken) form.append("takenAt", taken);
     try {
       const res = await fetch("/api/reports", { method: "POST", body: form });
       const body = (await res.json()) as { ok: boolean; error?: string };
@@ -276,7 +278,8 @@ export default function ReportScreen() {
             onChange={(e) => {
               const f = e.target.files?.[0];
               e.target.value = "";
-              if (f) void shrinkPhoto(f).then(send);
+              // Library photo: remember when it was taken (time-consistency check on the server).
+              if (f) void Promise.all([shrinkPhoto(f), takenAt(f)]).then(([b, t]) => send(b, t));
             }}
           />
         </div>

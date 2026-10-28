@@ -1,5 +1,6 @@
 // Client-safe event shapes + display helpers (no server imports here).
 import type { Reopening } from "../clearing/estimate.ts";
+import type { EventVerification } from "../verification/types.ts";
 export type EventStatus = "open" | "slow" | "one_lane" | "closed" | "unknown";
 
 export interface MapEvent {
@@ -107,6 +108,8 @@ export interface EventDetail extends MapEvent {
   investigation: InvestigationSummary | null;
   /** Why the event is doubtful right now ("last confirmed 9 h ago") → shows "Check again"; null = fresh. */
   checkReason: string | null;
+  /** Dual-model verification roll-up over this event's reports. */
+  verification: EventVerification | null;
 }
 
 export interface InvestigationSummary {

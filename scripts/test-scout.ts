@@ -37,6 +37,7 @@ const users = [
 await req("POST", "users?on_conflict=id", users);
 // Fresh start for these demo users + any open request on Kataula's segment.
 await req("DELETE", `alerts?user_id=in.(${SCOUT},${DRIVER},${OFF})`);
+await req("DELETE", `reports?user_id=eq.${SCOUT}&is_demo=eq.true`); // earlier runs' answers (repeatable test)
 await req("DELETE", `scout_requests?segment_id=eq.${encodeURIComponent(ev.segment_id)}`);
 
 const r1 = await ensureRequest(ev.segment_id, "Is any lane open at Kataula now?", { isDemo: true });

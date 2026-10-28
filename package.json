@@ -33,7 +33,8 @@
     "test:reopening": "node --env-file-if-exists=.env.local scripts/test-reopening.ts",
     "test:investigator": "node --env-file-if-exists=.env.local scripts/test-investigator.ts",
     "test:scout": "node --env-file-if-exists=.env.local scripts/test-scout.ts",
-    "test:share": "node --env-file-if-exists=.env.local scripts/test-share.ts"
+    "test:share": "node --env-file-if-exists=.env.local scripts/test-share.ts",
+    "test:time-check": "node --env-file-if-exists=.env.local scripts/test-time-check.ts"
   },
   "dependencies": {
     "@meta-sam/parser": "^0.1.0",

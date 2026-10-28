@@ -22,6 +22,7 @@ const Input = z.object({
   lng: z.coerce.number().min(72).max(82),
   text: z.string().trim().max(1000).optional(),
   scout: z.uuid().optional(),
+  takenAt: z.iso.datetime({ offset: true }).optional(),
 });
 
 const bad = (error: string, status = 400) => NextResponse.json({ ok: false, error }, { status });
@@ -33,7 +34,7 @@ export async function POST(req: Request) {
   } catch {
     return bad("expected multipart/form-data");
   }
-  const parsed = Input.safeParse({ lat: form.get("lat"), lng: form.get("lng"), text: form.get("text") ?? undefined, scout: form.get("scout") ?? undefined });
+  const parsed = Input.safeParse({ lat: form.get("lat"), lng: form.get("lng"), text: form.get("text") ?? undefined, scout: form.get("scout") ?? undefined, takenAt: form.get("takenAt") ?? undefined });
   if (!parsed.success) return bad(`invalid input: ${parsed.error.issues.map((i) => i.path.join(".")).join(", ")}`);
   const photo = form.get("photo");
   if (!(photo instanceof File) || !photo.type.startsWith("image/")) return bad("photo (image file) is required");
@@ -70,11 +71,12 @@ export async function POST(req: Request) {
         },
       });
     }
-    const { lat, lng, text, scout } = parsed.data;
+    const { lat, lng, text, scout, takenAt } = parsed.data;
     const userId = await ensureUserId();
     const data = await submitReport({
       userId,
       scoutRequestId: scout ?? null,
+      takenAt: takenAt ?? null,
       photo: prepared,
       lat,
       lng,
