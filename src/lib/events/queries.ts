@@ -2,7 +2,7 @@
 import { select } from "../db/supabase.ts";
 import type { EventStatus, MapEvent } from "./types.ts";
 
-interface Row {
+export interface EventRow {
   id: string;
   type: string;
   status: EventStatus;
@@ -21,14 +21,21 @@ interface Row {
 
 /** Throws on database errors; callers decide how to degrade. */
 export async function openEventsInBbox(w: number, s: number, e: number, n: number, limit = 300): Promise<MapEvent[]> {
-  const rows = await select<Row>(
+  const rows = await select<EventRow>(
     "events",
-    "select=id,type,status,place_name,lat,lng,summary,confidence,last_confirmed_at,sources,models_agreed,eta_clear," +
-      "road_segments(road_ref,road_name),photos(annotated_url,public_url)" +
+    `select=${EVENT_SELECT}` +
       `&resolved_at=is.null&lat=gte.${s}&lat=lte.${n}&lng=gte.${w}&lng=lte.${e}` +
       `&order=last_confirmed_at.desc&limit=${limit}`,
   );
-  return rows.map((r) => ({
+  return rows.map(toMapEvent);
+}
+
+export const EVENT_SELECT =
+  "id,type,status,place_name,lat,lng,summary,confidence,last_confirmed_at,sources,models_agreed,eta_clear," +
+  "road_segments(road_ref,road_name),photos(annotated_url,public_url)";
+
+export function toMapEvent(r: EventRow): MapEvent {
+  return {
     id: r.id,
     type: r.type,
     status: r.status,
@@ -44,5 +51,5 @@ export async function openEventsInBbox(w: number, s: number, e: number, n: numbe
     modelsAgreed: r.models_agreed,
     etaClear: r.eta_clear,
     photoUrl: r.photos.find((p) => p.annotated_url)?.annotated_url ?? r.photos[0]?.public_url ?? null,
-  }));
+  };
 }
