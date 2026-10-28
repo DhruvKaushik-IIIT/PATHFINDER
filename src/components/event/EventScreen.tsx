@@ -1,0 +1,214 @@
+"use client";
+
+// Frame 05 Disruption detail (docs/design/glass-html/Disruption.dc.html): tall sheet over the map.
+// Big numbers first (stat tiles), evidence below (photo, sources, timeline). Every number is "~".
+import { Check, CircleHelp, Clock, Image as ImageIcon, ShieldCheck, X } from "lucide-react";
+import dynamic from "next/dynamic";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { approxRange, clearWindow } from "@/lib/events/format";
+import { ago, STATUS_STYLE, type EventDetail } from "@/lib/events/types";
+import { eventTitle } from "@/components/route/routeData";
+
+const MapView = dynamic(() => import("@/components/map/MapView"), {
+  ssr: false,
+  loading: () => <div className="absolute inset-0 bg-land" />,
+});
+
+const TIME = new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", hour: "numeric", minute: "2-digit" });
+const t = (iso: string) => TIME.format(new Date(iso)).replace(/\s?(am|pm)$/i, (m) => ` ${m.trim().toUpperCase()}`);
+
+export default function EventScreen({ id }: { id: string }) {
+  const router = useRouter();
+  const [ev, setEv] = useState<EventDetail | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    fetch(`/api/events/${id}`)
+      .then((r) => r.json())
+      .then((b: { data?: EventDetail | null; error?: string; degraded?: string }) => {
+        if (!alive) return;
+        if (b.data) setEv(b.data);
+        else setError(b.error ?? b.degraded ?? "Event not found");
+      })
+      .catch(() => alive && setError("Couldn't load this event"));
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+
+  const close = () => (window.history.length > 1 ? router.back() : router.push("/"));
+  const st = ev ? (STATUS_STYLE[ev.status] ?? STATUS_STYLE.unknown) : null;
+  const m = ev?.measurements ?? {};
+  const total = typeof m.roadTotalWidthM === "number" ? m.roadTotalWidthM : m.roadTotalWidthM ? (m.roadTotalWidthM.min + m.roadTotalWidthM.max) / 2 : null;
+  const photo = ev?.photos.find((p) => p.annotatedUrl) ?? ev?.photos[0];
+  const src = ev?.sources;
+  const sourceText = src
+    ? [
+        src.reports && `${src.reports} report${src.reports > 1 ? "s" : ""}`,
+        src.official && `${src.official} official update${src.official > 1 ? "s" : ""}`,
+        src.news && `${src.news} news item${src.news > 1 ? "s" : ""}`,
+        ev?.modelsAgreed && ev.modelsAgreed >= 2 ? "2 AI models agree" : null,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : "";
+
+  return (
+    <main className="fixed inset-0 overflow-hidden">
+      <MapView
+        events={ev ? [ev] : []}
+        selectedEventId={ev?.id ?? null}
+        // The sheet leaves ~110 px of map at the top: centre ~0.2° south so the pin sits in that strip.
+        initialView={ev ? { latitude: ev.lat - 0.2, longitude: ev.lng, zoom: 10 } : undefined}
+        showRoadLayer={false}
+        key={ev ? "ready" : "loading"}
+      />
+
+      <section
+        aria-label="Disruption detail"
+        className="glass absolute inset-x-0 bottom-0 top-[112px] z-10 mx-auto flex max-w-[480px] flex-col gap-[14px] overflow-y-auto rounded-t-[30px] px-[18px] pb-6 pt-2"
+      >
+        <span aria-hidden className="h-[5px] w-[38px] shrink-0 self-center rounded-[3px] bg-[rgba(60,60,67,0.3)]" />
+
+        {error && <p className="py-8 text-center text-[15px] text-ink-2">{error}</p>}
+        {!ev && !error && (
+          <div className="flex flex-col gap-3" aria-busy>
+            <span className="h-7 w-52 animate-pulse rounded-lg bg-black/10" />
+            <span className="h-[168px] animate-pulse rounded-[18px] bg-black/10" />
+          </div>
+        )}
+
+        {ev && st && (
+          <>
+            <div className="flex items-start justify-between gap-[10px]">
+              <div className="flex min-w-0 flex-col gap-[3px]">
+                <h1 className="m-0 text-[24px] font-bold tracking-[-0.3px]">{eventTitle(ev.type, ev.placeName)}</h1>
+                <span className="text-[14px] text-ink-2">
+                  {[ev.roadRef, `since ${t(ev.startedAt)}`, `updated ${ago(ev.lastConfirmedAt)}`].filter(Boolean).join(" · ")}
+                </span>
+              </div>
+              <button type="button" aria-label="Close" onClick={close} className="flex size-[30px] shrink-0 items-center justify-center rounded-full bg-[rgba(118,118,128,0.16)] text-ink-2">
+                <X size={16} strokeWidth={2.6} aria-hidden />
+              </button>
+            </div>
+
+            {/* evidence photo (AI-annotated, faces/plates blurred) */}
+            {photo ? (
+              <Link href={`/event/${ev.id}/photos`} className="relative block h-[168px] shrink-0 overflow-hidden rounded-[18px] bg-[#3D4245]">
+                {/* eslint-disable-next-line @next/next/no-img-element -- Supabase public URL */}
+                <img src={photo.annotatedUrl ?? photo.publicUrl ?? ""} alt={`AI-annotated photo: ${ev.summary ?? ""}`} className="size-full object-cover" />
+                <span className="absolute left-[10px] top-[10px] rounded-[8px] bg-black/50 px-[9px] py-[5px] text-[12px] font-bold text-white backdrop-blur-[10px]">
+                  {st.word === "One lane" ? "One lane open" : st.word}
+                </span>
+                <span className="absolute bottom-[10px] right-[10px] flex items-center gap-1.5 rounded-full bg-white/85 px-[10px] py-[5px] text-[13px] font-semibold text-ink">
+                  <ImageIcon size={14} aria-hidden /> See {ev.photos.length} photo{ev.photos.length > 1 ? "s" : ""}
+                </span>
+              </Link>
+            ) : (
+              <div className="flex h-[88px] shrink-0 items-center justify-center rounded-[18px] bg-white/60 px-6 text-center text-[13px] text-ink-2">
+                No photos yet — reported by {sourceText || "travellers"}
+              </div>
+            )}
+
+            {/* big numbers */}
+            <div className="grid grid-cols-2 gap-2">
+              <Tile label="Blocked stretch" value={approxRange(m.blockedLengthM, "m")} />
+              <Tile
+                label="Road left"
+                value={m.roadWidthLeftM && m.roadWidthLeftM.max < 0.5 ? "None" : approxRange(m.roadWidthLeftM, "m")}
+                suffix={total && m.roadWidthLeftM ? `of ~${Math.round(total)}` : undefined}
+              />
+              <Tile label="Clears around" value={clearWindow(ev.etaClear) ?? "Unknown"} />
+              {/* TODO(phase-5): debris volume → clearing-time estimate */}
+              <Tile label="Last confirmed" value={ago(ev.lastConfirmedAt)} />
+            </div>
+
+            {/* passability: word + colour */}
+            <div className="flex gap-2" role="list" aria-label="Who can pass">
+              {(
+                [
+                  ["Bikes", ev.passable.bike],
+                  ["Cars", ev.passable.car],
+                  ["Buses", ev.passable.bus],
+                ] as const
+              ).map(([label, ok]) => (
+                <span
+                  key={label}
+                  role="listitem"
+                  className="flex h-[38px] flex-1 items-center justify-center gap-1.5 rounded-[12px] text-[14px] font-semibold"
+                  style={
+                    ok === true
+                      ? { background: "rgba(52,199,89,0.16)", color: "#1A6B35" }
+                      : ok === false
+                        ? { background: "rgba(255,59,48,0.14)", color: "#A1251C" }
+                        : { background: "rgba(142,142,147,0.16)", color: "#48484A" }
+                  }
+                >
+                  {ok === true ? <Check size={15} strokeWidth={3} aria-hidden /> : ok === false ? <X size={15} strokeWidth={3} aria-hidden /> : <CircleHelp size={15} aria-hidden />}
+                  {label}
+                  <span className="sr-only">{ok === true ? "can pass" : ok === false ? "cannot pass" : "unknown"}</span>
+                </span>
+              ))}
+            </div>
+
+            {/* what's happening, in English + Hindi */}
+            {ev.summary && (
+              <div className="glass-card flex flex-col gap-1 px-[14px] py-3">
+                <span className="text-[14px]">{ev.summary}</span>
+                {ev.summaryHi && (
+                  <span lang="hi" className="text-[14px] text-ink-2">
+                    {ev.summaryHi}
+                  </span>
+                )}
+              </div>
+            )}
+
+            {/* TODO(phase-5): reopening predictor line · TODO(phase-4): crew progress card (/route/repairs) */}
+
+            <div className="glass-card flex items-start gap-[10px] px-[14px] py-3">
+              <ShieldCheck size={20} className="mt-px shrink-0 text-open" aria-hidden />
+              <span className="flex flex-col gap-0.5">
+                <span className="text-[15px] font-semibold">Verified · {Math.round(ev.confidence * 100)}% confidence</span>
+                {sourceText && <span className="text-[12px] text-ink-2">{sourceText}</span>}
+              </span>
+            </div>
+
+            {ev.timeline.length > 0 && (
+              <div className="glass-card flex flex-col px-[14px] py-1">
+                {ev.timeline.slice(0, 4).map((item, i, arr) => (
+                  <div key={`${item.at}-${i}`} className={`flex gap-[10px] py-[10px] ${i < arr.length - 1 ? "border-b-[0.5px] border-[rgba(60,60,67,0.18)]" : ""}`}>
+                    <Clock size={14} className="mt-[3px] shrink-0 text-ink-3" aria-hidden />
+                    <span className="flex min-w-0 flex-col gap-px">
+                      <span className="text-[14px]">{item.text}</span>
+                      <span className="text-[12px] text-ink-3">
+                        {item.actor ?? item.kind} · {ago(item.at)}
+                      </span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* TODO(phase-5): Share alert card (Muse Image) */}
+            <p className="mt-auto text-center text-[12px] text-ink-2">Estimates from photos and reports · verify with official sources</p>
+          </>
+        )}
+      </section>
+    </main>
+  );
+}
+
+function Tile({ label, value, suffix }: { label: string; value: string | null; suffix?: string }) {
+  return (
+    <div className="flex flex-col gap-px rounded-[14px] bg-white/82 p-3">
+      <span className="text-[12px] text-ink-2">{label}</span>
+      <span className="text-[20px] font-bold">
+        {value ?? "Unknown"}
+        {suffix && <span className="ml-1 text-[13px] font-medium text-ink-2">{suffix}</span>}
+      </span>
+    </div>
+  );
+}

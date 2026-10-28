@@ -121,8 +121,15 @@ export function classifyError(err: unknown): ClassifiedError {
   return { kind: "unknown", retry: false, tripBreaker: false, message };
 }
 
-/** Throw this from an attempt when the model replied but the output is unusable (e.g. failed zod). */
-export class InvalidOutputError extends Error {}
+/** Throw this from an attempt when the model replied but the output is unusable (e.g. failed zod).
+ *  Pass the tokens already spent so ai_calls still records the cost of the failed attempt. */
+export class InvalidOutputError extends Error {
+  readonly usage?: Usage;
+  constructor(message: string, usage?: Usage) {
+    super(message);
+    this.usage = usage;
+  }
+}
 
 // ---------------------------------------------------------------- cost + logging
 
@@ -250,9 +257,11 @@ export async function runJob<T>(opts: {
         };
       } catch (err) {
         const e = classifyError(err);
+        const spent = err instanceof InvalidOutputError ? err.usage : undefined;
         logCall({
           at: new Date().toISOString(), purpose: opts.purpose, provider: a.provider, model: a.model,
-          inputTokens: 0, outputTokens: 0, costUsd: null, latencyMs: Date.now() - started,
+          inputTokens: spent?.inputTokens ?? 0, outputTokens: spent?.outputTokens ?? 0,
+          costUsd: spent ? estimateCost(a.model, spent) : null, latencyMs: Date.now() - started,
           ok: false, fallbackUsed, errorKind: e.kind,
         });
         if (e.tripBreaker) markDown(a.provider, `${e.kind}${e.status ? ` ${e.status}` : ""}: ${e.message}`);
@@ -532,6 +541,9 @@ async function agentLoop<T>(
     const msg = r.choices[0]?.message;
     const calls = (msg?.tool_calls ?? []).filter((tc) => tc.type === "function");
     if (!msg || !calls.length) {
+      // Some turns answer with the verdict as plain JSON instead of the tool: accept it if it validates.
+      const asText = parseJson(opts.submit.schema, msg?.content);
+      if (asText) return { data: { data: asText, trace: [...trace, `${opts.submit.name} (as text)`], turns: turn }, usage };
       if (nudged) break;
       nudged = true;
       messages.push({ role: "assistant", content: msg?.content ?? "" });
@@ -564,7 +576,7 @@ async function agentLoop<T>(
     if (submitted !== null) return { data: { data: submitted, trace, turns: turn }, usage };
     for (const res of results) messages.push({ role: "tool", tool_call_id: res.id, content: res.content });
   }
-  throw new InvalidOutputError(`agent ended without a valid ${opts.submit.name}`);
+  throw new InvalidOutputError(`agent ended without a valid ${opts.submit.name}`, usage);
 }
 
 export interface RouteCheckOutput {

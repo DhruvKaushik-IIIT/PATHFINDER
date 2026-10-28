@@ -7,7 +7,7 @@ import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { MapRef } from "react-map-gl/maplibre";
 import Sheet from "@/components/glass/Sheet";
 import Toast from "@/components/glass/Toast";
@@ -79,10 +79,12 @@ export default function RouteScreen() {
     };
   }, [from, to, fromName, toName, depart, query]);
 
-  // Fit the map to the routes once they arrive (leave room for the sheet).
-  useEffect(() => {
+  // Fit the map to the routes once both the plan and the map are ready (leave room for the sheet).
+  const fittedFor = useRef<RoutePlan | null>(null);
+  const fit = useCallback(() => {
     const coords = plan?.routes.flatMap((r) => r.geometry.coordinates);
-    if (!coords?.length || !mapRef.current) return;
+    if (!plan || fittedFor.current === plan || !coords?.length || !mapRef.current) return;
+    fittedFor.current = plan;
     const xs = coords.map((c) => c[0]!);
     const ys = coords.map((c) => c[1]!);
     mapRef.current.fitBounds(
@@ -93,6 +95,7 @@ export default function RouteScreen() {
       { padding: { top: 120, bottom: 470, left: 40, right: 40 }, duration: 600 },
     );
   }, [plan]);
+  useEffect(fit, [fit]);
 
   if (!from || !to) {
     return (
@@ -122,6 +125,7 @@ export default function RouteScreen() {
         mapRef={mapRef}
         events={best?.events ?? []}
         onSelectEvent={(e) => router.push(`/event/${e.id}`)}
+        onViewChange={fit}
         routes={plan?.routes.map((r) => r.geometry) ?? []}
         showRoadLayer={false}
       />
@@ -245,6 +249,13 @@ export default function RouteScreen() {
                   </Link>
                 ))}
               </div>
+            )}
+
+            {others.length === 0 && check && check.by !== "code" && (
+              <Link href={`/route/options?${query}`} className="flex items-center justify-between rounded-[14px] bg-white/80 px-[14px] py-3 text-[15px] font-semibold text-link no-underline">
+                Compare when to leave
+                <ChevronRight size={15} strokeWidth={2.6} aria-hidden />
+              </Link>
             )}
 
             {/* why: which model, which checks, which sources */}
