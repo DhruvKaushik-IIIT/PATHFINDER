@@ -135,6 +135,10 @@ export default function ReportScreen() {
       const res = await fetch("/api/reports", { method: "POST", body: form });
       const body = (await res.json()) as { ok: boolean; error?: string };
       if (!body.ok) throw new Error(body.error ?? "Could not send the report");
+      // Same photo as an earlier report: nothing new to show (the API never re-runs AI on it).
+      if ((body as { data?: { duplicate?: boolean } }).data?.duplicate) {
+        throw new Error("This photo was already reported — take a new one");
+      }
       sessionStorage.setItem(LAST_REPORT_KEY, JSON.stringify(body));
       router.push("/report/done");
     } catch (err) {
