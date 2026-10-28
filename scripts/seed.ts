@@ -230,6 +230,10 @@ await req("POST", "events?on_conflict=id", events, "resolution=merge-duplicates,
 // Timelines: replace this seed's items (re-running must not duplicate them).
 await req("DELETE", `event_timeline?event_id=in.(${SEEDS.map((s) => id(s.n)).join(",")})`);
 await req("POST", "event_timeline", timeline, "return=minimal");
+// Demo field updates / official progress photos on seed events would contradict the reset state.
+const seedIds = SEEDS.map((s) => id(s.n)).join(",");
+await req("DELETE", `official_updates?event_id=in.(${seedIds})&is_demo=eq.true`);
+await req("DELETE", `photos?event_id=in.(${seedIds})&source=eq.official&is_demo=eq.true`);
 console.log(`\nseeded ${events.length} demo events + ${timeline.length} timeline items (is_demo=true)`);
 
 // ---------------------------------------------------------------- crews (Command Centre)

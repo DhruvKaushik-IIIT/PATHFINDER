@@ -16,27 +16,20 @@ import DispatchCard from "./DispatchCard";
 import { eventTitle, STATUS_STYLE } from "@/lib/events/types";
 import { hoursText, roughCount, type CommandCentre, type QueueItem } from "@/lib/official/types";
 import type { AreaRisk } from "@/lib/risk/types";
+import { machinesLabel } from "@/lib/repairs/types";
 
 const MapView = dynamic(() => import("@/components/map/MapView"), {
   ssr: false,
   loading: () => <div className="absolute inset-0 bg-land" />,
 });
 
-/** ["JCB","JCB","Tipper"] → "2 JCB + tipper" */
-function machinesText(m: string[]): string {
-  const counts = new Map<string, number>();
-  for (const x of m) counts.set(x, (counts.get(x) ?? 0) + 1);
-  return [...counts]
-    .map(([name, n], i) => `${n > 1 ? `${n} ` : ""}${i === 0 || name === name.toUpperCase() ? name : name.toLowerCase()}`)
-    .join(" + ");
-}
 
 function detail(q: QueueItem): string {
   const parts = [`~${roughCount(q.vehiclesPerDay)} veh/day`];
   if (q.road) parts.unshift(q.road);
   if (q.debrisM3) parts.push(`~${roughCount((q.debrisM3.min + q.debrisM3.max) / 2)} m³`);
   parts.push(`${hoursText(q.hoursLeft)}${q.etaKnown ? "" : " est."}`);
-  parts.push(q.crew ? `${q.crew.name}${q.crew.machines.length ? ` (${machinesText(q.crew.machines)})` : ""}`.replace(/ /g, "\u00a0") : "unassigned");
+  parts.push(q.crew ? `${q.crew.name}${q.crew.machines.length ? ` (${machinesLabel(q.crew.machines)})` : ""}`.replace(/ /g, "\u00a0") : "unassigned");
   return parts.join(" · ");
 }
 
@@ -57,11 +50,16 @@ export default function CommandCentreScreen() {
   const [version, setVersion] = useState(0);
   const mapRef = useRef<MapRef>(null);
 
-  // Coming back from Publish on the advisory screen.
+  // Coming back from Publish (advisory) or Post update (field update).
   useEffect(() => {
-    const sent = new URLSearchParams(window.location.search).get("published");
-    if (sent === null) return;
-    setToast(`Advisory published — sent to ${sent} traveller${sent === "1" ? "" : "s"} watching this road.`);
+    const q = new URLSearchParams(window.location.search);
+    const sent = q.get("published");
+    const updated = q.get("updated");
+    if (sent === null && updated === null) return;
+    if (sent !== null) setToast(`Advisory published — sent to ${sent} traveller${sent === "1" ? "" : "s"} watching this road.`);
+    else if (updated === "open") setToast("Marked fully open — the event is closed and the crew is free again. Road Watch is re-checking trips.");
+    else if (updated === "warn") setToast("Update posted, but the photo didn't match — it's flagged on the timeline. Road Watch is re-checking trips.");
+    else setToast("Update posted — travellers on this road will see it. Road Watch is re-checking trips.");
     window.history.replaceState(null, "", "/official");
   }, []);
 
@@ -196,9 +194,8 @@ export default function CommandCentreScreen() {
                 const st = STATUS_STYLE[q.status];
                 return (
                   <li key={q.event.id}>
-                    {/* TODO(phase-4C): chevron → /official/field/[id] (Field update, frame 15) */}
                     <Link
-                      href={`/event/${q.event.id}`}
+                      href={`/official/field/${q.event.id}`}
                       className="flex items-start gap-3 rounded-[16px] bg-white/[0.86] p-[14px] text-ink no-underline"
                     >
                       <span className="w-[18px] shrink-0 text-[15px] font-bold">{q.rank}</span>
