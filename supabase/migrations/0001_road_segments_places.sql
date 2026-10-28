@@ -29,7 +29,9 @@ create index if not exists places_geom_idx on places using gist (geom);
 -- Public read-only; writes only via the service role (seed/fetch scripts).
 alter table road_segments enable row level security;
 alter table places enable row level security;
+drop policy if exists "road_segments are public" on road_segments;
 create policy "road_segments are public" on road_segments for select using (true);
+drop policy if exists "places are public" on places;
 create policy "places are public" on places for select using (true);
 
 -- Segments inside a bounding box, for GET /api/segments?bbox=
