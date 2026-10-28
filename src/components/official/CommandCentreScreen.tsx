@@ -12,6 +12,7 @@ import type { MapRef } from "react-map-gl/maplibre";
 import Sheet from "@/components/glass/Sheet";
 import Toast from "@/components/glass/Toast";
 import RiskLayer from "@/components/map/RiskLayer";
+import DispatchCard from "./DispatchCard";
 import { eventTitle, STATUS_STYLE } from "@/lib/events/types";
 import { hoursText, roughCount, type CommandCentre, type QueueItem } from "@/lib/official/types";
 import type { AreaRisk } from "@/lib/risk/types";
@@ -53,7 +54,16 @@ export default function CommandCentreScreen() {
   const [cc, setCc] = useState<CommandCentre | null>(null);
   const [risk, setRisk] = useState<AreaRisk | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [version, setVersion] = useState(0);
   const mapRef = useRef<MapRef>(null);
+
+  // Coming back from Publish on the advisory screen.
+  useEffect(() => {
+    const sent = new URLSearchParams(window.location.search).get("published");
+    if (sent === null) return;
+    setToast(`Advisory published — sent to ${sent} traveller${sent === "1" ? "" : "s"} watching this road.`);
+    window.history.replaceState(null, "", "/official");
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -72,6 +82,7 @@ export default function CommandCentreScreen() {
         }
         setCc(j.data);
         if (j.degraded) setToast(j.degraded);
+        if (version > 0) return; // refresh after approve: risk layer unchanged
         // Rain-risk layer over the district (no AI; one Open-Meteo request, cached server-side).
         const d = j.data.official.district;
         fetch(`/api/risk/area?lat=${d.lat}&lng=${d.lng}&radiusKm=50`)
@@ -85,7 +96,9 @@ export default function CommandCentreScreen() {
     return () => {
       alive = false;
     };
-  }, [router]);
+  }, [router, version]);
+
+  const onApproved = useCallback(() => setVersion((v) => v + 1), []);
 
   async function signOut() {
     await fetch("/api/official/logout", { method: "POST" }).catch(() => {});
@@ -212,7 +225,9 @@ export default function CommandCentreScreen() {
             </ol>
           )}
 
-          {/* TODO(phase-4B): AI Dispatch Plan card (Crew Dispatch agent) + Approve plan / Advisory */}
+          {cc && cc.queue.length > 0 && (
+            <DispatchCard version={version} advisoryEventId={cc.queue[0]!.event.id} onApproved={onApproved} onMessage={setToast} />
+          )}
 
           <p className="m-0 px-1 text-center text-[12px] leading-[1.4] text-ink-3">
             Impact = vehicles reaching each spot before it clears × time each loses (estimates from road class, status and ETA)

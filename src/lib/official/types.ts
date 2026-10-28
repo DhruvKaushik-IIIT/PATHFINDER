@@ -5,8 +5,10 @@ import type { District } from "./districts.ts";
 export interface QueueItem {
   rank: number;
   event: MapEvent;
-  /** "NH-3 km 212"-style location line; null when unknown. */
+  /** "NH-3"-style road label; null when unknown. */
   road: string | null;
+  /** OSM road class (drives the traffic estimate). */
+  highway: string | null;
   vehiclesPerDay: number;
   vehiclesHit: number;
   vehicleHours: number;
@@ -31,6 +33,39 @@ export interface CommandCentre {
   stats: { active: number; crewsFree: number; crewsTotal: number; vehiclesHit: number; watching: number };
   queue: QueueItem[];
   crews: CrewInfo[];
+}
+
+export type DispatchAction = "keep" | "send" | "send_later";
+
+export interface DispatchStep {
+  crewId: string;
+  crewName: string;
+  eventId: string;
+  /** "Landslide at Kataula" */
+  eventTitle: string;
+  action: DispatchAction;
+  /** Short timing, e.g. "now", "after Aut clears (~2 PM)", "after the rain (~4 PM)". */
+  when: string;
+  /** One plain sentence shown in the plan card. */
+  text: string;
+  /** Estimated hours from now until the event is cleared under this plan (code). */
+  clearInH: number;
+}
+
+export interface DispatchPlan {
+  steps: DispatchStep[];
+  /** Lost vehicle-hours (next 24 h) without changes vs. with this plan — computed in code. */
+  baselineVh: number;
+  planVh: number;
+  savedVh: number;
+  headline: string;
+  headlineHi: string | null;
+  reasoning: string;
+  by: "meta" | "baseten" | "mock" | "code";
+  model?: string;
+  /** Tool calls the agent made (for the "why" line). */
+  trace: string[];
+  cached: boolean;
 }
 
 /** "6–8 h" · "~3 h" · "45 min" */

@@ -55,8 +55,15 @@ export function impactOf(e: ImpactInput, now = Date.now()): Impact {
     ? { min: Math.max(0.5, earliest), max: Math.max(1, latest) }
     : { min: def * 0.75, max: def };
   if (e.status === "open" || e.type === "clear") hoursLeft.min = hoursLeft.max = 0;
-  const window = Math.min(24, (hoursLeft.min + hoursLeft.max) / 2);
-  const vehiclesHit = e.status === "open" ? 0 : Math.round((vehiclesPerDay * window) / 24);
-  const vehicleHours = Math.round(vehiclesHit * DELAY_H[e.status] * Math.max(0.3, e.confidence));
-  return { vehiclesPerDay, hoursLeft, etaKnown, vehiclesHit, vehicleHours };
+  const mid = (hoursLeft.min + hoursLeft.max) / 2;
+  const vehiclesHit = e.status === "open" ? 0 : Math.round((vehiclesPerDay * Math.min(24, mid)) / 24);
+  return { vehiclesPerDay, hoursLeft, etaKnown, vehiclesHit, vehicleHours: vehicleHoursIf(e, mid) };
+}
+
+/** Lost vehicle-hours if the event clears in `hours` from now (what-if for Crew Dispatch). */
+export function vehicleHoursIf(e: ImpactInput, hours: number): number {
+  if (e.status === "open" || e.type === "clear") return 0;
+  const vehiclesPerDay = VEHICLES_PER_DAY[e.highway ?? ""] ?? 400;
+  const hit = (vehiclesPerDay * Math.min(24, Math.max(0, hours))) / 24;
+  return Math.round(hit * DELAY_H[e.status] * Math.max(0.3, e.confidence));
 }

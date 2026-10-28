@@ -56,6 +56,7 @@ export async function rankedQueue(d: District, crews: CrewInfo[], now = Date.now
         rank: 0,
         event: ev,
         road: roadLabel(ev.roadRef),
+        highway: r.road_segments?.highway ?? null,
         vehiclesPerDay: imp.vehiclesPerDay,
         vehiclesHit: imp.vehiclesHit,
         vehicleHours: imp.vehicleHours,

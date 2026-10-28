@@ -18,6 +18,8 @@ export interface Official {
   role: "official" | "crew" | "admin";
   org: string;
   district: District;
+  /** Demo account → everything it writes is is_demo (wiped by `pnpm seed --wipe`). */
+  isDemo: boolean;
 }
 
 function authBase(): string {
@@ -62,9 +64,9 @@ async function authUserId(accessToken: string): Promise<string | null> {
 }
 
 async function staffRow(authId: string): Promise<Official | null> {
-  const [u] = await select<{ id: string; display_name: string | null; role: string; org: string | null; district: string | null }>(
+  const [u] = await select<{ id: string; display_name: string | null; role: string; org: string | null; district: string | null; is_demo: boolean }>(
     "users",
-    `select=id,display_name,role,org,district&auth_user_id=eq.${authId}&limit=1`,
+    `select=id,display_name,role,org,district,is_demo&auth_user_id=eq.${authId}&limit=1`,
   );
   if (!u || !STAFF.has(u.role)) return null;
   return {
@@ -73,6 +75,7 @@ async function staffRow(authId: string): Promise<Official | null> {
     role: u.role as Official["role"],
     org: u.org ?? "Official",
     district: districtOf(u.district),
+    isDemo: u.is_demo,
   };
 }
 
