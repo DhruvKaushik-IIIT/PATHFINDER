@@ -7,6 +7,8 @@ import type { FeatureCollection } from "geojson";
 import { setWorkerUrl, type StyleSpecification } from "maplibre-gl";
 import { useEffect, useState, type Ref } from "react";
 import Map, { AttributionControl, Layer, Marker, Source, type MapRef } from "react-map-gl/maplibre";
+import type { MapEvent } from "@/lib/events/types";
+import EventPin from "./EventPin";
 import { loadGlassStyle } from "./glassStyle";
 
 // MapLibre 6 loads its worker from next to its own bundle, which Next.js doesn't emit.
@@ -35,10 +37,23 @@ export default function MapView({
   mapRef,
   myLocation,
   showRoadLayer = true,
+  events = [],
+  selectedEventId = null,
+  onSelectEvent,
+  onViewChange,
+  initialView,
+  children,
 }: {
   mapRef?: Ref<MapRef>;
   myLocation?: LatLng | null;
   showRoadLayer?: boolean;
+  events?: MapEvent[];
+  selectedEventId?: string | null;
+  onSelectEvent?: (e: MapEvent) => void;
+  /** Fires after load and after each pan/zoom (e.g. to refetch events for the new area). */
+  onViewChange?: () => void;
+  initialView?: LatLng & { zoom: number };
+  children?: React.ReactNode;
 }) {
   const [style, setStyle] = useState<StyleSpecification | null>(null);
   const [styleFailed, setStyleFailed] = useState(false);
@@ -66,7 +81,7 @@ export default function MapView({
     <Map
       ref={mapRef}
       mapStyle={style}
-      initialViewState={{ ...MANDI, zoom: 9 }}
+      initialViewState={initialView ?? { ...MANDI, zoom: 9 }}
       maxBounds={NORTH_INDIA}
       minZoom={5}
       style={{ position: "absolute", inset: 0 }}
@@ -74,10 +89,12 @@ export default function MapView({
       dragRotate={false}
       pitchWithRotate={false}
       touchPitch={false}
-      onLoad={(e) =>
+      onLoad={(e) => {
         // Compact attribution starts expanded; start collapsed to the (i) button.
-        e.target.getContainer().querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show")
-      }
+        e.target.getContainer().querySelector(".maplibregl-ctrl-attrib")?.classList.remove("maplibregl-compact-show");
+        onViewChange?.();
+      }}
+      onMoveEnd={() => onViewChange?.()}
     >
       {/* Top-left, under the profile button: the sheet covers the bottom of the map. */}
       <AttributionControl position="top-left" compact customAttribution="© OpenStreetMap contributors · OpenFreeMap" />
@@ -106,6 +123,14 @@ export default function MapView({
           />
         </Source>
       )}
+
+      {events.map((ev) => (
+        <Marker key={ev.id} latitude={ev.lat} longitude={ev.lng} anchor="center" style={{ zIndex: ev.id === selectedEventId ? 2 : 1 }}>
+          <EventPin event={ev} selected={ev.id === selectedEventId} onClick={() => onSelectEvent?.(ev)} />
+        </Marker>
+      ))}
+
+      {children}
 
       {myLocation && (
         <Marker latitude={myLocation.latitude} longitude={myLocation.longitude} anchor="center">
