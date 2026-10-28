@@ -65,11 +65,21 @@ export async function annotate(a: AnnotateInput): Promise<Buffer> {
   const pad = Math.round(6 * s);
   const parts: string[] = [];
 
+  const placed: { x: number; y: number; w: number; h: number }[] = [];
+  const hits = (x: number, y: number, w: number, h: number) =>
+    placed.some((r) => x < r.x + r.w && r.x < x + w && y < r.y + r.h && r.y < y + h);
+
   const label = (x: number, y: number, text: string, bg: string, anchor: "start" | "middle" = "start") => {
     const w = Math.round(text.length * fs * 0.55 + pad * 2);
     const h = Math.round(fs + pad * 1.4);
     const lx = Math.max(4, Math.min(W - w - 4, anchor === "middle" ? x - w / 2 : x));
-    const ly = Math.max(4, Math.min(H - h - 4, y));
+    let ly = Math.max(4, Math.min(H - h - 4, y));
+    // Nudge down (then up) until it doesn't cover an earlier label.
+    for (let k = 1; k <= 6 && hits(lx, ly, w, h); k++) {
+      const step = Math.ceil(k / 2) * (h + 4) * (k % 2 ? 1 : -1);
+      ly = Math.max(4, Math.min(H - h - 4, y + step));
+    }
+    placed.push({ x: lx, y: ly, w, h });
     parts.push(
       `<rect x="${lx}" y="${ly}" width="${w}" height="${h}" rx="${Math.round(6 * s)}" fill="${bg}"/>`,
       `<text x="${lx + pad}" y="${ly + h / 2}" dominant-baseline="central" font-family="Inter, Helvetica, Arial, sans-serif" font-size="${fs}" font-weight="700" fill="#1D1D1F">${esc(text)}</text>`,
@@ -90,7 +100,9 @@ export async function annotate(a: AnnotateInput): Promise<Buffer> {
   const debris = bounds(sam, ["landslide", "rock"]);
   const len = approx(claim.measurements.blockedLengthM);
   if (debris && claim.eventType !== "clear") {
-    label((debris.left + debris.right) / 2, debris.top + (debris.bottom - debris.top) * 0.4, len ? `Debris · ${len} long` : "Debris", DEBRIS, "middle");
+    // The slide/rock masks are "debris" for a landslide, but the broken slope for a collapsed road.
+    const what = claim.eventType === "road_damage" ? "Collapsed road" : "Debris";
+    label((debris.left + debris.right) / 2, debris.top + (debris.bottom - debris.top) * 0.4, len ? `${what} · ${len} long` : what, DEBRIS, "middle");
   }
   for (const { b, text } of machines.slice(0, 3)) label(b.left, b.top - fs - pad * 2, text, MACHINE);
   const strip = Math.round(54 * s);
