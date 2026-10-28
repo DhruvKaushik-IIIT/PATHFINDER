@@ -6,7 +6,13 @@ import type OpenAI from "openai";
 import { APIConnectionError, APIConnectionTimeoutError, APIError } from "openai";
 import { insert, hasDb } from "../db/supabase.ts";
 import { client, hasKey, MODELS, type Provider } from "./clients.ts";
+import { readFileSync } from "node:fs";
+import { CLAIM_SYSTEM, claimUserText } from "./prompts/claim.ts";
+import { VERIFY_SYSTEM, verifyUserText } from "./prompts/verify.ts";
 import { segmentImage, type SamResult } from "./sam.ts";
+import { ClaimSet, jsonSchemaFormat, parseJson, Verdict, type Claim } from "./schemas.ts";
+import { z } from "zod";
+import { transcribeWav } from "./voice.ts";
 
 // ---------------------------------------------------------------- mode
 
@@ -313,5 +319,159 @@ export function segment(jpeg: Buffer, concept: string): Promise<JobResult<SamRes
   });
 }
 
-// TODO(phase-1): writeClaim(), verifyClaim(), transcribe()
+// ---------------------------------------------------------------- helpers for JSON jobs
+
+type ChatContent = OpenAI.Chat.Completions.ChatCompletionContentPart[];
+
+/**
+ * One structured-output chat call (cookbook 01/04: response_format json_schema), zod-validated.
+ * Invalid JSON → retried once inside the attempt (6.2 rule 1), then InvalidOutputError → next provider.
+ */
+async function chatJson<T>(
+  c: OpenAI,
+  provider: Provider,
+  model: string,
+  opts: { name: string; schema: z.ZodType<T>; system: string; content: ChatContent; effort?: "minimal" | "low" | "medium" | "high" },
+): Promise<{ data: T; usage: Usage }> {
+  const total: Usage = { inputTokens: 0, cachedInputTokens: 0, outputTokens: 0 };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const r = await c.chat.completions.create({
+      model,
+      messages: [
+        // Meta wants the `developer` role for instructions; Baseten takes the classic `system`.
+        { role: provider === "meta" ? "developer" : "system", content: opts.system },
+        { role: "user", content: opts.content },
+      ],
+      response_format: jsonSchemaFormat(opts.name, opts.schema),
+      reasoning_effort: opts.effort ?? "low",
+    });
+    const u = usageFromChat(r);
+    total.inputTokens += u.inputTokens;
+    total.cachedInputTokens += u.cachedInputTokens;
+    total.outputTokens += u.outputTokens;
+    const data = parseJson(opts.schema, r.choices[0]?.message?.content);
+    if (data) return { data, usage: total };
+  }
+  throw new InvalidOutputError(`${opts.name}: reply failed schema validation twice`);
+}
+
+/** Fixtures for AI_MODE=mock (data/seed/mocks/<name>.json). */
+function fixture<T>(name: string, schema: z.ZodType<T>): T {
+  return schema.parse(JSON.parse(readFileSync(`${process.cwd()}/data/seed/mocks/${name}.json`, "utf8")));
+}
+
+const imagePart = (jpeg: Buffer): OpenAI.Chat.Completions.ChatCompletionContentPartImage => ({
+  type: "image_url",
+  image_url: { url: `data:image/jpeg;base64,${jpeg.toString("base64")}` },
+});
+
+// ---------------------------------------------------------------- claim + verify
+
+export type ClaimInput = Parameters<typeof claimUserText>[0] & { jpeg: Buffer };
+
+/** Photo (+ SAM, voice, text) → claims. Baseten Spark Open first, Meta Spark fallback; null = save as pending. */
+export function writeClaim(input: ClaimInput): Promise<JobResult<ClaimSet | null>> {
+  const content: ChatContent = [{ type: "text", text: claimUserText(input) }, imagePart(input.jpeg)];
+  const attempt = (provider: Provider, model: string): Attempt<ClaimSet | null> => ({
+    provider,
+    model,
+    run: (c) => chatJson(c, provider, model, { name: "claims", schema: ClaimSet, system: CLAIM_SYSTEM, content }),
+  });
+  return runJob<ClaimSet | null>({
+    purpose: "write_claim",
+    attempts: [attempt("baseten", MODELS.sparkOpen), attempt("meta", MODELS.spark)],
+    mock: () => fixture("claims", ClaimSet),
+    lastResort: () => null,
+  });
+}
+
+export interface VerifyOutcome {
+  verdict: Verdict;
+  /** "rules" when no AI could verify. */
+  by: Provider | "mock" | "rules";
+}
+
+/**
+ * Independent second opinion on the photo's claim. Meta Spark first (a different model from the
+ * claim writer → "2 AI models agree"), Baseten fallback, rule-based last resort.
+ */
+export async function verifyClaim(jpeg: Buffer, claim: Claim, context: string): Promise<JobResult<VerifyOutcome>> {
+  const content: ChatContent = [{ type: "text", text: verifyUserText(claim, context) }, imagePart(jpeg)];
+  const attempt = (provider: Provider, model: string): Attempt<VerifyOutcome> => ({
+    provider,
+    model,
+    run: async (c) => {
+      const { data, usage } = await chatJson(c, provider, model, { name: "verdict", schema: Verdict, system: VERIFY_SYSTEM, content });
+      return { data: { verdict: data, by: provider }, usage };
+    },
+  });
+  return runJob<VerifyOutcome>({
+    purpose: "verify_claim",
+    attempts: [attempt("meta", MODELS.spark), attempt("baseten", MODELS.sparkOpen)],
+    mock: () => ({ verdict: fixture("verdict", Verdict), by: "mock" }),
+    // No AI: trust a confident claim provisionally, never more than "pending" for weak ones.
+    lastResort: () => ({
+      by: "rules",
+      verdict: {
+        verdict: claim.confidence >= 0.6 && claim.status !== "unknown" ? "accept" : "pending",
+        agrees: false,
+        confidence: Math.min(claim.confidence, 0.5),
+        correctedStatus: null,
+        correctedEventType: null,
+        reasoning: "AI verifier unavailable — rule-based check only.",
+      },
+    }),
+  });
+}
+
+// ---------------------------------------------------------------- voice
+
+export interface Transcript {
+  text: string;
+  by: Provider | "mock";
+}
+
+const AUDIO_PROMPT =
+  "Transcribe the attached voice note exactly, in the language spoken (Hindi in Devanagari). " +
+  "If there is no intelligible speech, set hasSpeech=false and transcript to an empty string. Reply with JSON only.";
+const AudioTranscript = z.object({ hasSpeech: z.boolean(), transcript: z.string() });
+
+/** WAV → transcript. Muse Voice Transcribe (auto-detect, best for Hindi in Phase 0) → Baseten audio input → null. */
+export function transcribe(wav: Buffer): Promise<JobResult<Transcript | null>> {
+  const VOICE_COST_PER_SEC = 0.18 / 3600;
+  return runJob<Transcript | null>({
+    purpose: "transcribe",
+    attempts: [
+      {
+        provider: "meta",
+        model: MODELS.voice,
+        run: async () => {
+          const r = await transcribeWav(wav);
+          if (!r.transcript?.trim()) throw new InvalidOutputError("empty transcript");
+          return {
+            data: { text: r.transcript.trim(), by: "meta" },
+            costUsd: ((r.audioDurationMs ?? 0) / 1000) * VOICE_COST_PER_SEC,
+          };
+        },
+      },
+      {
+        provider: "baseten",
+        model: MODELS.sparkOpen,
+        // Structured, so a refusal or "no speech" can't leak in as a transcript.
+        run: async (c) => {
+          const { data, usage } = await chatJson(c, "baseten", MODELS.sparkOpen, {
+            name: "transcript",
+            schema: AudioTranscript,
+            system: AUDIO_PROMPT,
+            content: [{ type: "input_audio", input_audio: { data: wav.toString("base64"), format: "wav" } }],
+          });
+          if (!data.hasSpeech || !data.transcript.trim()) throw new InvalidOutputError("no speech in audio");
+          return { data: { text: data.transcript.trim(), by: "baseten" }, usage };
+        },
+      },
+    ],
+    mock: () => ({ text: "औट के पास पहाड़ से पत्थर गिरे हैं, एक लेन खुली है।", by: "mock" }),
+    lastResort: () => null,
+  });
+}
 // TODO(phase-2): routeCheck()

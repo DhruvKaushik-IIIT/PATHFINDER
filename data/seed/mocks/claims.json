@@ -1,0 +1,22 @@
+{
+  "claims": [
+    {
+      "eventType": "landslide",
+      "status": "one_lane",
+      "passable": { "bike": true, "car": true, "bus": false },
+      "measurements": {
+        "blockedLengthM": { "min": 30, "max": 40 },
+        "roadWidthLeftM": { "min": 2.5, "max": 3.2 },
+        "blockedPct": { "min": 50, "max": 65 },
+        "vehiclesVisible": 2
+      },
+      "crowd": "medium",
+      "atReportLocation": true,
+      "placeHint": null,
+      "summary": "Landslide debris covers half the road near Aut; one lane open, buses cannot pass.",
+      "summaryHi": "औट के पास भूस्खलन का मलबा आधी सड़क पर है; एक लेन खुली है, बसें नहीं जा सकतीं।",
+      "confidence": 0.8,
+      "reasoning": "(mock) Rocks cover the right half of the carriageway; a car fits past on the left."
+    }
+  ]
+}
