@@ -13,6 +13,8 @@ export interface MapEvent {
   confidence: number;
   lastConfirmedAt: string;
   reports: number;
+  /** News items backing it; reports === 0 && news > 0 → "from news, not yet confirmed". */
+  news: number;
   modelsAgreed: number | null;
   photoUrl: string | null;
   etaClear?: { earliest: string; latest: string } | null;

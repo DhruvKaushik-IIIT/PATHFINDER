@@ -12,7 +12,7 @@ interface Row {
   summary: string | null;
   confidence: number;
   last_confirmed_at: string;
-  sources: { reports?: number } | null;
+  sources: { reports?: number; official?: number; news?: number } | null;
   models_agreed: number | null;
   eta_clear: { earliest: string; latest: string } | null;
   road_segments: { road_ref: string | null; road_name: string | null } | null;
@@ -40,6 +40,7 @@ export async function openEventsInBbox(w: number, s: number, e: number, n: numbe
     confidence: r.confidence,
     lastConfirmedAt: r.last_confirmed_at,
     reports: r.sources?.reports ?? 0,
+    news: r.sources?.news ?? 0,
     modelsAgreed: r.models_agreed,
     etaClear: r.eta_clear,
     photoUrl: r.photos.find((p) => p.annotated_url)?.annotated_url ?? r.photos[0]?.public_url ?? null,

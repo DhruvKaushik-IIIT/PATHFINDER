@@ -12,7 +12,8 @@ import { VERIFY_SYSTEM, verifyUserText } from "./prompts/verify.ts";
 import { segmentImage, type SamResult } from "./sam.ts";
 import { ROUTE_CHECK_SYSTEM, routeCheckUserText } from "./prompts/routeCheck.ts";
 import { NEARBY_SYSTEM, nearbyUserText } from "./prompts/nearby.ts";
-import { ClaimSet, jsonSchemaFormat, NearbySummary, parseJson, RouteVerdict, Verdict, type Claim } from "./schemas.ts";
+import { NEWS_PARSE_SYSTEM, newsParseUserText, newsSearchPrompt } from "./prompts/news.ts";
+import { ClaimSet, jsonSchemaFormat, NearbySummary, NewsItems, parseJson, RouteVerdict, Verdict, type Claim } from "./schemas.ts";
 import { ist, ROUTE_CHECK_TOOLS, runRouteCheckTool, type RouteCheckContext } from "./tools/routeCheck.ts";
 import { z } from "zod";
 import { transcribeWav } from "./voice.ts";
@@ -504,6 +505,91 @@ export function nearbySummary(
     attempts: [attempt("baseten", MODELS.sparkOpen), attempt("meta", MODELS.spark)],
     mock: template,
     lastResort: template,
+  });
+}
+
+// ---------------------------------------------------------------- news ingest (Phase 3)
+
+export const SEARCH_COST = 0.0025; // per web search (5.4)
+
+export interface GroundedDigest {
+  text: string;
+  /** Every page the model cited or opened — the only URLs a news item may point at. */
+  sources: { url: string; title: string | null }[];
+  searches: number;
+}
+
+/**
+ * Search grounding (cookbook 01/10): Meta Spark + the built-in web_search tool on the Responses API.
+ * Meta only (Baseten has no search). null → skip this ingest run.
+ */
+export function searchRoadNews(nowIst: string): Promise<JobResult<GroundedDigest | null>> {
+  const model = MODELS.spark;
+  return runJob<GroundedDigest | null>({
+    purpose: "news_search",
+    attempts: [
+      {
+        provider: "meta",
+        model,
+        kind: "agent",
+        run: async (c) => {
+          const r = await c.responses.create({
+            model,
+            input: newsSearchPrompt(nowIst),
+            tools: [{ type: "web_search", search_context_size: "medium" }],
+            reasoning: { effort: "low" },
+          });
+          const usage: Usage = {
+            inputTokens: r.usage?.input_tokens ?? 0,
+            cachedInputTokens: r.usage?.input_tokens_details?.cached_tokens ?? 0,
+            outputTokens: r.usage?.output_tokens ?? 0,
+          };
+          const sources = new Map<string, string | null>();
+          let searches = 0;
+          for (const item of r.output) {
+            if (item.type === "web_search_call") {
+              const action = (item as { action?: { type?: string; url?: string } }).action;
+              if (action?.type === "search") searches++;
+              if (action?.type === "open_page" && action.url && !sources.has(action.url)) sources.set(action.url, null);
+            }
+            if (item.type === "message") {
+              for (const block of item.content) {
+                if (block.type !== "output_text") continue;
+                for (const a of block.annotations ?? []) if (a.type === "url_citation") sources.set(a.url, a.title ?? null);
+              }
+            }
+          }
+          // Only the final answer: earlier message items are "I'll search…" narration.
+          const messages = r.output.filter((i) => i.type === "message");
+          const last = messages[messages.length - 1];
+          const text = last?.type === "message" ? last.content.map((b) => (b.type === "output_text" ? b.text : "")).join("") : "";
+          if (!text.trim()) throw new InvalidOutputError("empty grounded answer", usage);
+          return {
+            data: { text, sources: [...sources].map(([url, title]) => ({ url, title })), searches },
+            usage,
+            costUsd: (estimateCost(model, usage) ?? 0) + searches * SEARCH_COST,
+          };
+        },
+      },
+    ],
+    mock: () => null,
+    lastResort: () => null,
+  });
+}
+
+/** Grounded digest → structured items. Baseten Spark Open → Meta Spark (a second model reads the first one's digest). */
+export function parseRoadNews(input: Parameters<typeof newsParseUserText>[0]): Promise<JobResult<NewsItems | null>> {
+  const content: ChatContent = [{ type: "text", text: newsParseUserText(input) }];
+  const attempt = (provider: Provider, model: string): Attempt<NewsItems | null> => ({
+    provider,
+    model,
+    run: (c) => chatJson(c, provider, model, { name: "news_items", schema: NewsItems, system: NEWS_PARSE_SYSTEM, content }),
+  });
+  return runJob<NewsItems | null>({
+    purpose: "news_parse",
+    attempts: [attempt("baseten", MODELS.sparkOpen), attempt("meta", MODELS.spark)],
+    mock: () => ({ items: [] }),
+    lastResort: () => null,
   });
 }
 

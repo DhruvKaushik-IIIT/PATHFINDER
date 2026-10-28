@@ -113,3 +113,25 @@ export const NearbySummary = z.object({
   summaryHi: z.string().describe("the same in simple Hindi (Devanagari)"),
 });
 export type NearbySummary = z.infer<typeof NearbySummary>;
+
+// ---------------------------------------------------------------- News ingest (Phase 3)
+
+export const NewsItem = z.object({
+  placeName: z.string(),
+  district: z.string().nullable(),
+  roadRef: z.string().nullable().describe("e.g. NH-3, NH-205, SH-?; null if not given"),
+  roadName: z.string().nullable().describe("e.g. Chandigarh-Manali Highway"),
+  eventType: z.enum(EVENT_TYPES),
+  status: z.enum(STATUSES),
+  reopened: z.boolean(),
+  publishedAt: z.string().nullable(),
+  sourceUrl: z.string(),
+  sourceTitle: z.string().nullable(),
+  summary: z.string(),
+  summaryHi: z.string(),
+  confidence: z.number().min(0).max(1),
+});
+export type NewsItem = z.infer<typeof NewsItem>;
+
+export const NewsItems = z.object({ items: z.array(NewsItem).max(12) });
+export type NewsItems = z.infer<typeof NewsItems>;

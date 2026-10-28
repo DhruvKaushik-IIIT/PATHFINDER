@@ -222,6 +222,7 @@ export default function NearbyScreen() {
                             {TYPE_WORD[e.type] ?? "Road issue"}
                             {e.roadRef ? ` · ${e.roadRef}` : ""} · {e.distanceKm < 1 ? "<1" : Math.round(e.distanceKm)} km ·{" "}
                             {ago(e.lastConfirmedAt)}
+                            {!e.reports && e.news ? " · news" : ""}
                           </span>
                         </span>
                         <ChevronRight size={14} strokeWidth={2.6} className="shrink-0 text-unknown" aria-hidden />
