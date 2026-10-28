@@ -38,7 +38,12 @@ async function overpass(name: string, query: string): Promise<{ elements: unknow
   const t0 = Date.now();
   const res = await fetch(OVERPASS, {
     method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    // Overpass returns 406 to requests without an identifying User-Agent.
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded",
+      "User-Agent": "Pathfinder/0.1 (+https://github.com/DhruvKaushik-IIIT/PATHFINDER)",
+      Accept: "application/json",
+    },
     body: new URLSearchParams({ data: query }),
     signal: AbortSignal.timeout(240_000),
   });
