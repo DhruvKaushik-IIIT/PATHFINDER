@@ -3,7 +3,7 @@
 // Frame 08 Nearby (docs/design/glass-html/Nearby.dc.html): radius circle on the map, floating glass
 // radius picker, sheet with the AI summary + ranked list. Centre = ?lat&lng[&name], else your
 // location, else Mandi.
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, CloudRain } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -12,6 +12,8 @@ import { Layer, Source, type MapRef } from "react-map-gl/maplibre";
 import Sheet from "@/components/glass/Sheet";
 import Toast from "@/components/glass/Toast";
 import { ago, STATUS_STYLE, TYPE_WORD, type NearbyResult } from "@/lib/events/types";
+import RiskLayer from "@/components/map/RiskLayer";
+import { replayLabel, type AreaRisk } from "@/lib/risk/types";
 import { circle } from "./circle";
 
 const MapView = dynamic(() => import("@/components/map/MapView"), {
@@ -38,6 +40,9 @@ export default function NearbyScreen() {
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<string | null>(null);
   const [hindi, setHindi] = useState(false);
+  const [risk, setRisk] = useState<AreaRisk | null>(null);
+  const [showRisk, setShowRisk] = useState<boolean | null>(null); // null = follow the forecast (on if risky)
+  const replay = params.get("replay") === "1";
 
   // 1. Where are we looking? URL → my location (quick, coarse) → Mandi.
   useEffect(() => {
@@ -78,6 +83,21 @@ export default function NearbyScreen() {
 
   // Fit the circle once the map exists (it loads after the first effect run) and on radius change.
   const needsFit = useRef(true);
+  // 3. Rain-risk grid for the same circle (no AI, one Open-Meteo request).
+  useEffect(() => {
+    if (!center) return;
+    let alive = true;
+    const qs = new URLSearchParams({ lat: center.lat.toFixed(4), lng: center.lng.toFixed(4), radiusKm: String(radius), ...(replay && { replay: "1" }) });
+    fetch(`/api/risk/area?${qs}`)
+      .then((r) => r.json() as Promise<{ data: AreaRisk | null }>)
+      .then((b) => alive && setRisk(b.data))
+      .catch(() => alive && setRisk(null));
+    return () => {
+      alive = false;
+    };
+  }, [center, radius, replay]);
+  const riskOn = showRisk ?? (risk ? risk.level === "moderate" || risk.level === "high" : false);
+
   const fit = useCallback(() => {
     const map = mapRef.current;
     if (!map || !center) return;
@@ -110,6 +130,7 @@ export default function NearbyScreen() {
         myLocation={center?.isMe ? { latitude: center.lat, longitude: center.lng } : null}
         showRoadLayer={false}
       >
+        {riskOn && <RiskLayer id="pf-area-risk" areas={risk?.cells ?? []} />}
         {center && (
           <Source id="pf-radius" type="geojson" data={circle(center.lat, center.lng, radius)}>
             <Layer id="pf-radius-fill" type="fill" paint={{ "fill-color": "#0071E3", "fill-opacity": 0.08 }} />
@@ -149,10 +170,25 @@ export default function NearbyScreen() {
           ))}
         </div>
       </div>
-      {/* TODO(phase-3): rain-risk layer chip (Part C, Risk Forecast) */}
+      {/* rain-risk layer chip (Risk Forecast v1) */}
+      <div className="absolute right-[14px] top-[112px] z-10">
+        <button
+          type="button"
+          aria-pressed={riskOn}
+          disabled={!risk}
+          onClick={() => setShowRisk(!riskOn)}
+          className={`glass-float flex h-[36px] items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold disabled:opacity-60 ${
+            riskOn ? "text-risk-ink" : "text-ink"
+          }`}
+          style={riskOn ? { background: "rgba(123,92,214,0.18)" } : undefined}
+        >
+          <CloudRain size={15} strokeWidth={2.2} aria-hidden />
+          Rain risk{risk && risk.level !== "none" ? "" : risk ? " · none" : ""}
+        </button>
+      </div>
 
       {toast && (
-        <div className="absolute inset-x-[14px] top-[112px] z-20">
+        <div className="absolute inset-x-[14px] top-[156px] z-20">
           <Toast message={toast} onClose={() => setToast(null)} />
         </div>
       )}
@@ -200,6 +236,23 @@ export default function NearbyScreen() {
                 )}
               </p>
             </div>
+
+            {risk && (risk.level === "moderate" || risk.level === "high") && (
+              <button
+                type="button"
+                onClick={() => setShowRisk(true)}
+                className="flex items-start gap-[10px] rounded-[16px] bg-risk-bg px-[14px] py-3 text-left text-risk-ink"
+              >
+                <CloudRain size={18} strokeWidth={2.2} className="mt-px shrink-0" aria-hidden />
+                <span className="flex flex-col gap-0.5">
+                  <span className="text-[14px] font-semibold leading-snug">{risk.headline}</span>
+                  <span className="text-[12px] opacity-90">
+                    {risk.source === "replay" ? `Replay of real rain from ${replayLabel(risk.replayDate)} (demo)` : "Open-Meteo forecast"} · recent slides nearby raise the
+                    risk
+                  </span>
+                </span>
+              </button>
+            )}
 
             {data.items.length > 0 ? (
               <ul className="m-0 list-none rounded-[16px] bg-white/[0.82] p-0">

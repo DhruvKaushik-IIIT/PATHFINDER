@@ -17,7 +17,7 @@ const MERGE_DEG = 0.02; // ~2 km: news names a village, not the exact spot
 const NEWS_ONLY_MAX_CONF = 0.55; // "from news — not yet confirmed by travellers"
 
 export type Outcome =
-  | { action: "created" | "confirmed"; eventId: string }
+  | { action: "created" | "confirmed"; eventId: string; lat: number; lng: number }
   | { action: "skipped"; reason: string };
 
 export interface IngestReport {
@@ -187,7 +187,7 @@ async function apply(item: NewsItem, at: { lat: number; lng: number; name: strin
       existing.id,
       item.reopened ? `News says reopened — awaiting a traveller or official confirmation: ${item.summary}` : `In the news: ${item.summary}`,
     );
-    return { action: "confirmed", eventId: existing.id };
+    return { action: "confirmed", eventId: existing.id, lat, lng };
   }
 
   if (item.reopened || item.status === "open") return { action: "skipped", reason: "reopened, and no open event here to update" };
@@ -210,7 +210,7 @@ async function apply(item: NewsItem, at: { lat: number; lng: number; name: strin
     is_demo: demo,
   });
   await timeline(ev!.id, `From the news: ${item.summary}`);
-  return { action: "created", eventId: ev!.id };
+  return { action: "created", eventId: ev!.id, lat, lng };
 }
 
 /** Never throws for AI failures (returns ok:false + degraded); DB errors per item are caught too. */

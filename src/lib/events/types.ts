@@ -43,6 +43,13 @@ export const TYPE_WORD: Record<string, string> = {
   other: "Road issue",
 };
 
+const AT_TYPES = new Set(["landslide", "snow", "ice", "flood_water", "road_damage", "accident"]);
+/** "Landslide at Kataula" · "Traffic jam near Pandoh" */
+export function eventTitle(type: string, place: string | null): string {
+  const what = TYPE_WORD[type] ?? "Road issue";
+  return place ? `${what} ${AT_TYPES.has(type) ? "at" : "near"} ${place}` : what;
+}
+
 /** "just now" · "12 min ago" · "3 h ago" · "2 d ago" */
 export function ago(iso: string, now = Date.now()): string {
   const min = Math.max(0, Math.round((now - new Date(iso).getTime()) / 60_000));

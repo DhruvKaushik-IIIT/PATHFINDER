@@ -14,6 +14,7 @@ import type { LatLng } from "@/components/map/MapView";
 import { useEvents } from "@/components/map/useEvents";
 import { STATUS_STYLE, type MapEvent, type NearbyResult } from "@/lib/events/types";
 import type { Place } from "@/lib/geo/placeTypes";
+import { routeUrl, type WatchedTrip } from "@/lib/watch/types";
 
 // MapLibre needs `window` → client-only.
 const MapView = dynamic(() => import("@/components/map/MapView"), {
@@ -32,6 +33,7 @@ export default function HomeScreen() {
   const [picked, setPicked] = useState<Place | null>(null);
   const onSearchActive = useCallback((active: boolean) => setSearching(active), []);
   const near = useNearby(me);
+  const { unread, watching } = useRoadWatch();
 
   function pick(p: Place) {
     setPicked(p);
@@ -87,9 +89,14 @@ export default function HomeScreen() {
 
       {/* top-right: alerts + layers/locate stack */}
       <div className="absolute right-[14px] top-[56px] z-10 flex flex-col gap-[10px]">
-        <Link href="/alerts" aria-label="Alerts" className="glass-float relative flex size-[46px] items-center justify-center rounded-[14px] text-ink">
+        <Link href="/alerts" aria-label={unread ? `Alerts, ${unread} unread` : "Alerts"} className="glass-float relative flex size-[46px] items-center justify-center rounded-[14px] text-ink">
           <Bell size={22} strokeWidth={2} aria-hidden />
-          {/* TODO(phase-3): unread badge from /api/alerts */}
+          {unread > 0 && (
+            <span className="absolute -right-1 -top-1 flex h-[20px] min-w-[20px] items-center justify-center rounded-full bg-closed px-1 text-[12px] font-bold text-white">
+              {unread > 9 ? "9+" : unread}
+              <span className="sr-only"> unread</span>
+            </span>
+          )}
         </Link>
         <div className="glass-float flex w-[46px] flex-col rounded-[14px]">
           <button
@@ -140,19 +147,48 @@ export default function HomeScreen() {
             title={me ? "Near you right now" : "Around Mandi right now"}
             subtitle={near.text}
           />
-          {/* TODO(phase-3): watched trips */}
-          <Row
-            href="/route"
-            lead={<Eye size={20} strokeWidth={2} className="shrink-0 text-accent" aria-hidden />}
-            title="Watch a trip"
-            subtitle="Get an alert if your route changes"
-          />
+          {watching ? (
+            <Row
+              href={routeUrl(watching.from, watching.to, watching.departAt)}
+              lead={<Eye size={20} strokeWidth={2} className="shrink-0 text-accent" aria-hidden />}
+              title={`Watching ${watching.from.name} → ${watching.to.name}`}
+              subtitle={watching.lastVerdict?.headline ?? "Road Watch is on"}
+            />
+          ) : (
+            <Row
+              href="/route"
+              lead={<Eye size={20} strokeWidth={2} className="shrink-0 text-accent" aria-hidden />}
+              title="Watch a trip"
+              subtitle="Get an alert if your route changes"
+            />
+          )}
           </>
           )}
         </div>
       </Sheet>
     </main>
   );
+}
+
+/** Alerts bell badge + the first watched trip for the "Watching …" row. */
+function useRoadWatch(): { unread: number; watching: WatchedTrip | null } {
+  const [unread, setUnread] = useState(0);
+  const [watching, setWatching] = useState<WatchedTrip | null>(null);
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/alerts")
+      .then((r) => r.json() as Promise<{ data: { unread: number } }>)
+      .then((b) => alive && setUnread(b.data?.unread ?? 0))
+      .catch(() => {});
+    fetch("/api/watch")
+      .then((r) => r.json() as Promise<{ data: WatchedTrip[] }>)
+      .then((b) => alive && setWatching(b.data?.[0] ?? null))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return { unread, watching };
 }
 
 /** Counts for the "Near you right now" row: /api/nearby without the AI summary (free). */

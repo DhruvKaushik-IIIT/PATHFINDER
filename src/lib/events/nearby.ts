@@ -5,7 +5,7 @@ import { nearbySummary } from "../ai/router.ts";
 import type { NearbySummary } from "../ai/schemas.ts";
 import { nearestPlace, distanceM } from "../geo/snap.ts";
 import { openEventsInBbox } from "./queries.ts";
-import { ago, TYPE_WORD, type EventStatus, type MapEvent, type NearbyItem, type NearbyResult } from "./types.ts";
+import { ago, eventTitle, type EventStatus, type MapEvent, type NearbyItem, type NearbyResult } from "./types.ts";
 
 export const RADII_KM = [5, 10, 25, 50] as const;
 
@@ -19,11 +19,7 @@ function score(e: MapEvent, km: number, now: number): number {
   return SEVERITY[e.status] * (0.4 + 0.6 * e.confidence) * proximity * (0.3 + 0.7 * freshness);
 }
 
-const AT = new Set(["landslide", "snow", "ice", "flood_water", "road_damage", "accident"]);
-function title(e: MapEvent): string {
-  const what = TYPE_WORD[e.type] ?? "Road issue";
-  return e.placeName ? `${what} ${AT.has(e.type) ? "at" : "near"} ${e.placeName}` : what;
-}
+const title = (e: MapEvent) => eventTitle(e.type, e.placeName);
 
 const IST_FMT = new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", weekday: "short", hour: "numeric", minute: "2-digit" });
 const ist = (d: Date) => IST_FMT.format(d).replace(/\s?(am|pm)\b/gi, (m) => ` ${m.trim().toUpperCase()}`);

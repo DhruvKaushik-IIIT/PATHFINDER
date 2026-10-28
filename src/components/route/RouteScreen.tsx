@@ -3,7 +3,7 @@
 // Frame 03 Route result (docs/design/glass-html/Route.dc.html). Two steps so it feels instant:
 // 1. GET /api/route → map, route line, code verdict (no AI, ~1 s)
 // 2. POST /api/route-check → the Route Check agent's verdict replaces it (5–30 s; cached 20 min)
-import { ChevronLeft, ChevronRight, Sparkles } from "lucide-react";
+import { ChevronLeft, ChevronRight, CloudRain, Sparkles, Sun } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -14,6 +14,9 @@ import Toast from "@/components/glass/Toast";
 import { STATUS_STYLE } from "@/lib/events/types";
 import { clock, duration, VERDICT_STYLE } from "@/lib/geo/format";
 import type { RoutePlan } from "@/lib/geo/routeTypes";
+import type { WatchedTrip } from "@/lib/watch/types";
+import RiskLayer from "@/components/map/RiskLayer";
+import { replayLabel, type RouteRisk } from "@/lib/risk/types";
 import { checkedBy, departLabel, eventTitle, saveCheck, VERDICT_WORD, type CheckResult } from "./routeData";
 
 const MapView = dynamic(() => import("@/components/map/MapView"), {
@@ -31,12 +34,17 @@ export default function RouteScreen() {
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [showWhy, setShowWhy] = useState(false);
+  const [watchId, setWatchId] = useState<string | null>(null);
+  const [watchBusy, setWatchBusy] = useState(false);
+  const [risk, setRisk] = useState<RouteRisk | null>(null);
 
   const from = params.get("from");
   const to = params.get("to");
   const fromName = params.get("fromName") ?? "";
   const toName = params.get("toName") ?? "";
   const depart = params.get("depart");
+  // ?replay=1 → a saved real past rainy day instead of the live forecast (demo; labelled in the banner).
+  const replay = params.get("replay") === "1";
   const query = params.toString();
 
   useEffect(() => {
@@ -45,6 +53,7 @@ export default function RouteScreen() {
     setPlan(null);
     setCheck(null);
     setError(null);
+    setRisk(null);
     (async () => {
       try {
         const qs = new URLSearchParams({ from, to, fromName, toName, ...(depart && { depart }) });
@@ -53,6 +62,12 @@ export default function RouteScreen() {
         if (!body.data) return setError(body.degraded ?? "Routing is unavailable right now");
         setPlan(body.data);
         if (body.degraded) setToast(body.degraded);
+
+        // Rain risk (no AI) loads alongside the agent; it reuses the plan the server just cached.
+        fetch(`/api/risk/route?${qs}${replay ? "&replay=1" : ""}`)
+          .then((r) => r.json() as Promise<{ data: RouteRisk | null }>)
+          .then((b) => alive && setRisk(b.data))
+          .catch(() => {});
 
         setChecking(true);
         const res = await fetch("/api/route-check", {
@@ -77,7 +92,7 @@ export default function RouteScreen() {
     return () => {
       alive = false;
     };
-  }, [from, to, fromName, toName, depart, query]);
+  }, [from, to, fromName, toName, depart, query, replay]);
 
   // Fit the map to the routes once both the plan and the map are ready (leave room for the sheet).
   const fittedFor = useRef<RoutePlan | null>(null);
@@ -97,6 +112,21 @@ export default function RouteScreen() {
   }, [plan]);
   useEffect(fit, [fit]);
 
+  // Road Watch: is this trip (same from/to names) already watched on this device?
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/watch")
+      .then((r) => r.json() as Promise<{ data: WatchedTrip[] }>)
+      .then((b) => {
+        const hit = (b.data ?? []).find((t) => t.from.name === (fromName || "Start") && t.to.name === (toName || "Destination"));
+        if (alive) setWatchId(hit?.id ?? null);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [fromName, toName]);
+
   if (!from || !to) {
     return (
       <main className="fixed inset-0 flex flex-col items-center justify-center gap-4 bg-land px-8 text-center">
@@ -106,6 +136,41 @@ export default function RouteScreen() {
         </Link>
       </main>
     );
+  }
+
+  async function toggleWatch() {
+    if (!from || !to) return;
+    setWatchBusy(true);
+    try {
+      if (watchId) {
+        const res = await fetch(`/api/watch/${watchId}`, { method: "DELETE" });
+        if (!res.ok) throw new Error();
+        setWatchId(null);
+        setToast("Stopped watching this trip");
+      } else {
+        const v = check?.verdict;
+        const res = await fetch("/api/watch", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            from,
+            to,
+            fromName: plan?.from.name ?? (fromName || "Start"),
+            toName: plan?.to.name ?? (toName || "Destination"),
+            departAt: depart ?? null,
+            verdict: v ? { verdict: v.verdict, headline: v.headline, headlineHi: v.headlineHi } : null,
+          }),
+        });
+        const body = (await res.json()) as { data?: WatchedTrip };
+        if (!res.ok || !body.data) throw new Error();
+        setWatchId(body.data.id);
+        setToast("Watching — Road Watch will alert you if a road on this trip changes");
+      }
+    } catch {
+      setToast("Couldn't update Road Watch — try again");
+    } finally {
+      setWatchBusy(false);
+    }
   }
 
   const best = plan?.routes[0];
@@ -128,7 +193,9 @@ export default function RouteScreen() {
         onViewChange={fit}
         routes={plan?.routes.map((r) => r.geometry) ?? []}
         showRoadLayer={false}
-      />
+      >
+        <RiskLayer id="pf-route-risk" areas={risk?.stretches ?? []} />
+      </MapView>
 
       {/* top: back + trip pill */}
       <div className="absolute inset-x-[14px] top-[54px] z-10 mx-auto flex max-w-[480px] items-center gap-[10px]">
@@ -233,7 +300,26 @@ export default function RouteScreen() {
             )}
 
             {/* TODO(phase-4): "N repair crews working on your route" link (/route/repairs) */}
-            {/* TODO(phase-3): purple rain-risk banner from Risk Forecast */}
+            {/* Rain risk (Risk Forecast v1): purple banner for moderate/high, a calm weather line otherwise */}
+            {risk?.headline ? (
+              <div role="note" className="flex items-start gap-[10px] rounded-[16px] bg-risk-bg px-[14px] py-3 text-risk-ink">
+                <CloudRain size={20} strokeWidth={2.2} className="mt-px shrink-0" aria-hidden />
+                <span className="flex flex-col gap-0.5">
+                  <span className="text-[15px] font-semibold leading-snug">{risk.headline}</span>
+                  <span className="text-[12px] opacity-90">
+                    {risk.weatherLine} ·{" "}
+                    {risk.source === "replay" ? `Replay of real rain from ${replayLabel(risk.replayDate)} (demo)` : `Open-Meteo forecast · ${clock(risk.checkedAt)}`}
+                  </span>
+                </span>
+              </div>
+            ) : risk ? (
+              <div className="flex items-center gap-2 px-1 text-[13px] text-ink-2">
+                {risk.level === "low" ? <CloudRain size={15} aria-hidden /> : <Sun size={15} aria-hidden />}
+                <span>
+                  {risk.weatherLine} · {risk.source === "replay" ? `replay of ${replayLabel(risk.replayDate)}` : "Open-Meteo forecast"}
+                </span>
+              </div>
+            ) : null}
 
             {/* What-If chips: the agent's other options */}
             {others.length > 0 && (
@@ -278,16 +364,25 @@ export default function RouteScreen() {
 
             <button
               type="button"
-              onClick={() => setToast("Road Watch (re-plan + alerts) arrives in the next update")}
-              className="flex items-center gap-3 rounded-[14px] bg-white/80 px-[14px] py-3 text-left"
+              role="switch"
+              aria-checked={Boolean(watchId)}
+              disabled={watchBusy || !from || !to}
+              onClick={toggleWatch}
+              className="flex items-center gap-3 rounded-[14px] bg-white/80 px-[14px] py-3 text-left disabled:opacity-60"
             >
               <span className="flex flex-1 flex-col gap-px">
                 <span className="text-[15px] font-semibold">Watch this trip</span>
-                <span className="text-[13px] text-ink-2">Re-plan and alert me if anything changes</span>
+                <span className="text-[13px] text-ink-2">
+                  {watchId ? "Road Watch is on — you'll get an alert if anything changes" : "Re-plan and alert me if anything changes"}
+                </span>
               </span>
-              {/* TODO(phase-3): real switch wired to POST /api/watch */}
-              <span aria-hidden className="relative h-[31px] w-[51px] shrink-0 rounded-full bg-[rgba(120,120,128,0.16)]">
-                <span className="absolute left-[2px] top-[2px] size-[27px] rounded-full bg-white shadow" />
+              <span
+                aria-hidden
+                className={`relative h-[31px] w-[51px] shrink-0 rounded-full transition-colors ${watchId ? "bg-open" : "bg-[rgba(120,120,128,0.16)]"}`}
+              >
+                <span
+                  className={`absolute top-[2px] size-[27px] rounded-full bg-white shadow transition-[left] ${watchId ? "left-[22px]" : "left-[2px]"}`}
+                />
               </span>
             </button>
 

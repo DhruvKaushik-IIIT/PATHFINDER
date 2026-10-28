@@ -3,7 +3,7 @@
 // Each event is placed ON the nearest segment of the intended road (from data/segments.geojson), so
 // it snaps the same way a real report would. Fixed ids → re-running updates instead of duplicating.
 // Run: pnpm seed            (upsert demo events + timelines)
-//      pnpm seed --wipe     (delete ALL is_demo rows: events, timelines, reports, photos, claims)
+//      pnpm seed --wipe     (delete ALL is_demo rows: events, timelines, reports, photos, claims, news, trips, alerts, users)
 // TODO(phase-3): watched trips + sample alerts · TODO(phase-4): "PWD Mandi (demo)" account + 3 crews.
 import { readFileSync } from "node:fs";
 import type { FeatureCollection, LineString } from "geojson";
@@ -167,7 +167,7 @@ const fromNow = (h: number) => new Date(Date.now() + h * 3_600_000).toISOString(
 
 if (process.argv.includes("--wipe")) {
   // Children first; events cascade to their timeline.
-  for (const t of ["claims", "photos", "reports", "event_timeline", "events"]) {
+  for (const t of ["alerts", "watched_trips", "news_items", "claims", "photos", "reports", "event_timeline", "events", "users"]) {
     await req("DELETE", `${t}?is_demo=eq.true`);
     console.log(`wiped demo rows from ${t}`);
   }

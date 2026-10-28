@@ -225,11 +225,17 @@ async function detoursAround(blocked: Omit<RouteOption, "recommended" | "verdict
 const PLAN_TTL_MS = 3 * 60_000;
 const planCache = new Map<string, { at: number; plan: RoutePlan & { degraded?: string } }>();
 
-/** Throws only if routing itself fails (the caller degrades); events/towns degrade to empty. */
-export async function planRoute(from: NamedPoint, to: NamedPoint, departAt: Date): Promise<RoutePlan & { degraded?: string }> {
+/** Throws only if routing itself fails (the caller degrades); events/towns degrade to empty.
+ *  `fresh` skips the cache read (Road Watch must see the event that just changed) but still refills it. */
+export async function planRoute(
+  from: NamedPoint,
+  to: NamedPoint,
+  departAt: Date,
+  opts: { fresh?: boolean } = {},
+): Promise<RoutePlan & { degraded?: string }> {
   const key = `${[from.lat, from.lng, to.lat, to.lng].map((x) => x.toFixed(4)).join(",")}|${from.name}|${to.name}|${Math.floor(departAt.getTime() / 300_000)}`;
   const hit = planCache.get(key);
-  if (hit && Date.now() - hit.at < PLAN_TTL_MS) return hit.plan;
+  if (hit && !opts.fresh && Date.now() - hit.at < PLAN_TTL_MS) return hit.plan;
   const plan = await buildPlan(from, to, departAt);
   if (planCache.size > 100) planCache.delete(planCache.keys().next().value!);
   if (!plan.degraded) planCache.set(key, { at: Date.now(), plan });
