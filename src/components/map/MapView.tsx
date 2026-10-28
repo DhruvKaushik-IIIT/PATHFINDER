@@ -3,7 +3,7 @@
 // Full-screen base map (CLAUDE.md 7.6): MapLibre + OpenFreeMap tiles restyled to Glass,
 // faint dashed HP boundary, our road-segment layer, and the my-location dot.
 import "maplibre-gl/dist/maplibre-gl.css";
-import type { FeatureCollection } from "geojson";
+import type { FeatureCollection, LineString } from "geojson";
 import { setWorkerUrl, type StyleSpecification } from "maplibre-gl";
 import { useEffect, useState, type Ref } from "react";
 import Map, { AttributionControl, Layer, Marker, Source, type MapRef } from "react-map-gl/maplibre";
@@ -42,6 +42,7 @@ export default function MapView({
   onSelectEvent,
   onViewChange,
   initialView,
+  routes = [],
   children,
 }: {
   mapRef?: Ref<MapRef>;
@@ -53,6 +54,8 @@ export default function MapView({
   /** Fires after load and after each pan/zoom (e.g. to refetch events for the new area). */
   onViewChange?: () => void;
   initialView?: LatLng & { zoom: number };
+  /** Route lines: the first is the chosen one (accent, white casing); the rest are alternatives (grey). */
+  routes?: LineString[];
   children?: React.ReactNode;
 }) {
   const [style, setStyle] = useState<StyleSpecification | null>(null);
@@ -120,6 +123,39 @@ export default function MapView({
               "line-opacity": 0.28,
               "line-width": ["interpolate", ["linear"], ["zoom"], 7, 1.5, 12, 4],
             }}
+          />
+        </Source>
+      )}
+
+      {routes.length > 0 && (
+        <Source
+          id="pf-routes"
+          type="geojson"
+          data={{
+            type: "FeatureCollection",
+            features: routes.map((g, i) => ({ type: "Feature", properties: { main: i === 0 ? 1 : 0 }, geometry: g })),
+          }}
+        >
+          <Layer
+            id="pf-route-alt"
+            type="line"
+            filter={["==", ["get", "main"], 0]}
+            layout={{ "line-cap": "round", "line-join": "round" }}
+            paint={{ "line-color": "#8E99A4", "line-width": 5, "line-opacity": 0.7 }}
+          />
+          <Layer
+            id="pf-route-casing"
+            type="line"
+            filter={["==", ["get", "main"], 1]}
+            layout={{ "line-cap": "round", "line-join": "round" }}
+            paint={{ "line-color": "#FFFFFF", "line-width": 11 }}
+          />
+          <Layer
+            id="pf-route-main"
+            type="line"
+            filter={["==", ["get", "main"], 1]}
+            layout={{ "line-cap": "round", "line-join": "round" }}
+            paint={{ "line-color": "#0071E3", "line-width": 6 }}
           />
         </Source>
       )}
