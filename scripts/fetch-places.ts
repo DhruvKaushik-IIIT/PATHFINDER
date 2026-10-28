@@ -8,7 +8,11 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import * as turf from "@turf/turf";
 import type { Feature, MultiPolygon, Polygon } from "geojson";
 
-const OVERPASS = "https://overpass-api.de/api/interpreter";
+const OVERPASS = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter",
+  "https://overpass.private.coffee/api/interpreter",
+];
 const useCache = process.argv.includes("--cache");
 
 type Kind = "town" | "pass" | "trek" | "tunnel" | "village";
@@ -35,23 +39,37 @@ out center tags;`;
 async function overpass(): Promise<{ elements: OsmEl[] }> {
   const cachePath = "out/overpass/hp-places.json";
   if (useCache && existsSync(cachePath)) return JSON.parse(readFileSync(cachePath, "utf8"));
-  console.log("overpass: hp-places …");
-  const res = await fetch(OVERPASS, {
-    method: "POST",
-    // Overpass returns 406 to requests without an identifying User-Agent.
-    headers: {
-      "Content-Type": "application/x-www-form-urlencoded",
-      "User-Agent": "Pathfinder/0.1 (+https://github.com/DhruvKaushik-IIIT/PATHFINDER)",
-      Accept: "application/json",
-    },
-    body: new URLSearchParams({ data: query }),
-    signal: AbortSignal.timeout(300_000),
-  });
-  if (!res.ok) throw new Error(`Overpass hp-places: HTTP ${res.status} ${(await res.text()).slice(0, 200)}`);
-  const json = (await res.json()) as { elements: OsmEl[] };
-  mkdirSync("out/overpass", { recursive: true });
-  writeFileSync(cachePath, JSON.stringify(json));
-  return json;
+  // Busy servers answer 429/502/503/504 → back off, then try the next mirror.
+  for (const url of OVERPASS) {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      console.log(`overpass: hp-places via ${new URL(url).host} (try ${attempt}) …`);
+      try {
+        const res = await fetch(url, {
+          method: "POST",
+          // Overpass returns 406 to requests without an identifying User-Agent.
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": "Pathfinder/0.1 (+https://github.com/DhruvKaushik-IIIT/PATHFINDER)",
+            Accept: "application/json",
+          },
+          body: new URLSearchParams({ data: query }),
+          signal: AbortSignal.timeout(300_000),
+        });
+        if (res.ok) {
+          const json = (await res.json()) as { elements: OsmEl[] };
+          mkdirSync("out/overpass", { recursive: true });
+          writeFileSync(cachePath, JSON.stringify(json));
+          return json;
+        }
+        console.log(`  HTTP ${res.status}`);
+        if (![429, 502, 503, 504].includes(res.status)) break;
+      } catch (err) {
+        console.log(`  ${(err as Error).message}`);
+      }
+      if (attempt < 3) await new Promise((r) => setTimeout(r, 15_000 * 2 ** (attempt - 1)));
+    }
+  }
+  throw new Error("Overpass hp-places: all servers busy or failing — try again in a few minutes");
 }
 
 function kindOf(t: Record<string, string>): Kind | null {
