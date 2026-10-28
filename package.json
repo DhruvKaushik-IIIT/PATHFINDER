@@ -25,7 +25,9 @@
     "load-segments": "node --env-file-if-exists=.env.local scripts/load-segments.ts",
     "seed": "node --env-file-if-exists=.env.local scripts/seed.ts",
     "ingest-news": "node --env-file-if-exists=.env.local scripts/ingest-news.ts",
-    "test:road-watch": "node --env-file-if-exists=.env.local scripts/test-road-watch.ts"
+    "test:road-watch": "node --env-file-if-exists=.env.local scripts/test-road-watch.ts",
+    "test:risk": "node --env-file-if-exists=.env.local scripts/test-risk.ts",
+    "fetch-weather-replay": "node scripts/fetch-weather-replay.ts"
   },
   "dependencies": {
     "@meta-sam/parser": "^0.1.0",
