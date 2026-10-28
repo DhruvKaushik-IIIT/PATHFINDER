@@ -1,4 +1,5 @@
 // Client-safe event shapes + display helpers (no server imports here).
+import type { Reopening } from "../clearing/estimate.ts";
 export type EventStatus = "open" | "slow" | "one_lane" | "closed" | "unknown";
 
 export interface MapEvent {
@@ -100,6 +101,25 @@ export interface EventDetail extends MapEvent {
   sources: { reports: number; official: number; news: number; notices: number };
   photos: EventPhoto[];
   timeline: TimelineItem[];
+  /** Reopening predictor (photo trend or debris volume ÷ machine rate), null if it couldn't run. */
+  reopening: Reopening | null;
+  /** Latest Investigator check (timeline kind "ai"), if any. */
+  investigation: InvestigationSummary | null;
+  /** Why the event is doubtful right now ("last confirmed 9 h ago") → shows "Check again"; null = fresh. */
+  checkReason: string | null;
+}
+
+export interface InvestigationSummary {
+  at: string;
+  finding: "still_there" | "likely_changed" | "likely_cleared" | "conflicting" | "no_new_evidence" | "unavailable";
+  suggestedStatus: string | null;
+  explanation: string;
+  explanationHi: string | null;
+  evidence: string[];
+  by: string;
+  scoutRequested: boolean;
+  confidenceBefore: number;
+  confidenceAfter: number;
 }
 
 /** GET /api/nearby — one ranked event within the radius. */

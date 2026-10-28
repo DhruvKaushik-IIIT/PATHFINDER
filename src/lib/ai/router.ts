@@ -15,8 +15,10 @@ import { NEARBY_SYSTEM, nearbyUserText } from "./prompts/nearby.ts";
 import { NEWS_PARSE_SYSTEM, newsParseUserText, newsSearchPrompt } from "./prompts/news.ts";
 import { ADVISORY_SYSTEM, advisoryUserText } from "./prompts/advisory.ts";
 import { DISPATCH_SYSTEM, dispatchUserText } from "./prompts/dispatch.ts";
-import { Advisory, ClaimSet, DispatchProposal, jsonSchemaFormat, NearbySummary, NewsItems, parseJson, RouteVerdict, Verdict, type Claim } from "./schemas.ts";
+import { INVESTIGATE_SYSTEM, investigateUserText } from "./prompts/investigate.ts";
+import { Advisory, ClaimSet, DispatchProposal, Investigation, jsonSchemaFormat, NearbySummary, NewsItems, parseJson, RouteVerdict, Verdict, type Claim } from "./schemas.ts";
 import { DISPATCH_TOOLS, runDispatchTool, type DispatchContext } from "./tools/dispatch.ts";
+import { INVESTIGATE_TOOLS, runInvestigateTool, type InvestigateContext } from "./tools/investigate.ts";
 import { ist, ROUTE_CHECK_TOOLS, runRouteCheckTool, type RouteCheckContext } from "./tools/routeCheck.ts";
 import { z } from "zod";
 import { transcribeWav } from "./voice.ts";
@@ -527,9 +529,14 @@ export interface GroundedDigest {
  * Meta only (Baseten has no search). null → skip this ingest run.
  */
 export function searchRoadNews(nowIst: string): Promise<JobResult<GroundedDigest | null>> {
+  return groundedSearch(newsSearchPrompt(nowIst), "news_search");
+}
+
+/** One grounded web search (Meta Spark + web_search). Used by news ingest and the Investigator. */
+export function groundedSearch(prompt: string, purpose: string, contextSize: "low" | "medium" = "medium"): Promise<JobResult<GroundedDigest | null>> {
   const model = MODELS.spark;
   return runJob<GroundedDigest | null>({
-    purpose: "news_search",
+    purpose,
     attempts: [
       {
         provider: "meta",
@@ -538,8 +545,8 @@ export function searchRoadNews(nowIst: string): Promise<JobResult<GroundedDigest
         run: async (c) => {
           const r = await c.responses.create({
             model,
-            input: newsSearchPrompt(nowIst),
-            tools: [{ type: "web_search", search_context_size: "medium" }],
+            input: prompt,
+            tools: [{ type: "web_search", search_context_size: contextSize }],
             reasoning: { effort: "low" },
           });
           const usage: Usage = {
@@ -790,5 +797,40 @@ export function draftAdvisory(input: Parameters<typeof advisoryUserText>[0], tem
     attempts: [attempt("baseten", MODELS.sparkOpen), attempt("meta", MODELS.spark)],
     mock: template,
     lastResort: template,
+  });
+}
+
+export interface InvestigateOutput {
+  /** null → no AI answer (both providers down); the caller writes a rule-based note. */
+  findings: Investigation | null;
+  by: Provider | "mock" | "code";
+  trace: string[];
+}
+
+/** Investigator agent (6.4, Spark tier): Baseten Spark Open → Meta Spark, low effort. Never throws. */
+export function investigate(ctx: InvestigateContext, reason: string): Promise<JobResult<InvestigateOutput>> {
+  const user = investigateUserText({ eventId: ctx.event.id, reason, now: ist(new Date()) });
+  const attempt = (provider: Provider, model: string): Attempt<InvestigateOutput> => ({
+    provider,
+    model,
+    kind: "agent",
+    run: async (c) => {
+      const { data, usage } = await agentLoop(c, provider, model, {
+        system: INVESTIGATE_SYSTEM,
+        user,
+        tools: INVESTIGATE_TOOLS,
+        exec: (name, args) => runInvestigateTool(ctx, name, args),
+        submit: { name: "submit_findings", schema: Investigation },
+        maxTurns: 7,
+        effort: "low",
+      });
+      return { data: { findings: data.data, by: provider, trace: data.trace }, usage };
+    },
+  });
+  return runJob<InvestigateOutput>({
+    purpose: "investigate",
+    attempts: [attempt("baseten", MODELS.sparkOpen), attempt("meta", MODELS.spark)],
+    mock: () => ({ findings: null, by: "mock", trace: [] }),
+    lastResort: () => ({ findings: null, by: "code", trace: [] }),
   });
 }

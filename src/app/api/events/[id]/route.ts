@@ -2,6 +2,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { hasDb, select } from "@/lib/db/supabase.ts";
+import { debrisVolumeM3 } from "@/lib/clearing/estimate.ts";
+import { reopeningFor } from "@/lib/events/reopening.ts";
+import type { InvestigatedEvent } from "@/lib/ai/tools/investigate.ts";
+import { lastInvestigation, whyInvestigate } from "@/lib/investigate/investigator.ts";
 import type { EventDetail, EventStatus } from "@/lib/events/types.ts";
 
 export const dynamic = "force-dynamic";
@@ -43,6 +47,17 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     );
     if (!r) return NextResponse.json({ ok: false, error: "event not found" }, { status: 404 });
     const sources = { reports: 0, official: 0, news: 0, notices: 0, ...r.sources };
+    const measurements = r.measurements ?? {};
+    // Older events were stored before volumes existed: compute it on read (plain code, no AI).
+    if (!measurements.debrisVolumeM3) measurements.debrisVolumeM3 = debrisVolumeM3(r.type, measurements);
+    const [reopening, investigation] = await Promise.all([
+      reopeningFor({ id: r.id, type: r.type, status: r.status, measurements }).catch((err: Error) => {
+        console.warn("[event] reopening predictor failed:", err.message);
+        return null;
+      }),
+      lastInvestigation(r.id).catch(() => null),
+    ]);
+    const checkReason = r.resolved_at ? null : whyInvestigate({ ...r, sources } as unknown as InvestigatedEvent);
     const data: EventDetail = {
       id: r.id,
       type: r.type,
@@ -62,7 +77,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       modelsAgreed: r.models_agreed,
       photoUrl: r.photos.find((p) => p.annotated_url)?.annotated_url ?? r.photos[0]?.public_url ?? null,
       passable: r.passable ?? { bike: null, car: null, bus: null },
-      measurements: r.measurements ?? {},
+      measurements,
+      reopening,
+      investigation,
+      checkReason,
       etaClear: r.eta_clear,
       sources,
       photos: r.photos.map((p) => ({

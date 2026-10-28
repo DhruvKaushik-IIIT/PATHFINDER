@@ -3,6 +3,7 @@
 // 24 h) or creates a new one. Every change adds a timeline item. Latest verified evidence wins
 // for status (roads change by the hour); confidence grows with independent confirmations.
 import type { Claim, Verdict } from "../ai/schemas.ts";
+import { debrisVolumeM3, type Range } from "../clearing/estimate.ts";
 import { insert, select, update } from "../db/supabase.ts";
 
 const MERGE_WINDOW_H = 24;
@@ -29,6 +30,8 @@ export interface EventUpdate {
   lng: number;
   reportId: string;
   photoUrl: string | null;
+  /** SAM's own numbers for the photo (road width, etc.), merged under the claim's. */
+  sam?: { roadTotalWidthM?: Range; blockedLengthM?: Range; blockedPct?: Range } | null;
 }
 
 export interface EventResult {
@@ -76,6 +79,16 @@ export async function applyToWorldState(u: EventUpdate): Promise<EventResult> {
   const existing = await findOpenEvent(u);
   const now = new Date().toISOString();
   const conf = reportConfidence(u);
+  // Claim numbers win (the model saw the photo + SAM); SAM fills what the claim leaves out.
+  const sam = u.sam ?? {};
+  const cm = claim.measurements;
+  const measured = {
+    ...cm,
+    blockedLengthM: cm.blockedLengthM ?? sam.blockedLengthM ?? null,
+    blockedPct: cm.blockedPct ?? sam.blockedPct ?? null,
+    roadTotalWidthM: sam.roadTotalWidthM ?? null,
+  };
+  const measurements = { ...measured, debrisVolumeM3: debrisVolumeM3(type, measured) };
 
   const timeline = (eventId: string, text: string) =>
     insert("event_timeline", {
@@ -101,7 +114,7 @@ export async function applyToWorldState(u: EventUpdate): Promise<EventResult> {
       lat: u.lat,
       lng: u.lng,
       passable: claim.passable,
-      measurements: claim.measurements,
+      measurements,
       summary: claim.summary,
       summary_hi: claim.summaryHi,
       confidence: conf,
@@ -127,7 +140,7 @@ export async function applyToWorldState(u: EventUpdate): Promise<EventResult> {
     // A "clear" report reopens the road but keeps the event's original type for its history.
     ...(clears ? { status: "open", resolved_at: now } : { type, status }),
     passable: claim.passable,
-    measurements: claim.measurements,
+    measurements,
     summary: claim.summary,
     summary_hi: claim.summaryHi,
     // Independent confirmations compound: 1 − Π(1 − cᵢ), damped so one report can't max it out.

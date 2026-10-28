@@ -26,6 +26,11 @@ export function clearWindow(w: { earliest: string; latest: string } | null): str
   const prefix = DAY.format(a) === today ? "" : DAY.format(a) === tomorrow ? "Tomorrow " : `${a.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", weekday: "short" })} `;
   const ha = hour(a);
   const hb = hour(b);
+  // Window across midnight: name the second day too ("6 PM–Fri 6 AM").
+  if (DAY.format(a) !== DAY.format(b)) {
+    const dayB = DAY.format(b) === tomorrow ? "tomorrow " : `${b.toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata", weekday: "short" })} `;
+    return `${prefix}${ha}–${dayB}${hb}`;
+  }
   // "1 PM–2 PM" → "1–2 PM"
   const same = ha.slice(-2) === hb.slice(-2);
   return `${prefix}${same ? ha.slice(0, -3) : ha}–${hb}`;

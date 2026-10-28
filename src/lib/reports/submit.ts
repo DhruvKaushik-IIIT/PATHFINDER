@@ -11,6 +11,7 @@ import { insert, publicUrl, select, update, upload } from "../db/supabase.ts";
 import { snapToRoad } from "../geo/snap.ts";
 import { annotate } from "../images/annotate.ts";
 import { applyToWorldState, pointsFor, type EventResult } from "./events.ts";
+import { noteMentions } from "./mentions.ts";
 import { processPhoto, type PreparedPhoto } from "./processPhoto.ts";
 
 export interface SubmitInput {
@@ -40,6 +41,8 @@ export interface SubmitResult {
   verifiedBy: string | null;
   modelsAgreed: number;
   transcript: string | null;
+  /** Other places the voice note mentioned, and the open event each was matched to (if any). */
+  mentions: { placeHint: string; eventId: string | null }[];
   measurements: unknown;
   facesBlurred: boolean;
   timingsMs: Record<string, number>;
@@ -134,14 +137,18 @@ export async function submitReport(input: SubmitInput): Promise<SubmitResult> {
       claims.map((c) => ({ report_id: id, source: "photo", payload: c, confidence: c.confidence })),
     );
   }
-  // TODO(phase-5): claims about OTHER places (atReportLocation=false, placeHint) go to the Investigator.
+  // Claims about OTHER places (voice note): evidence on a nearby open event's timeline, never a new event.
+  const mentions = await noteMentions(claims, id).catch((err: Error) => {
+    console.warn("[reports] mentions failed:", err.message);
+    return [];
+  });
 
   let ev: EventResult = { eventId: null, action: "none", reportStatus: "pending", eventReports: 0 };
   if (here && verdict) {
     ev = await applyToWorldState({
       claim: here, verdict, verifiedBy: verifiedBy!, modelsAgreed,
       segmentId: snap.segment?.id ?? null, placeName: snap.placeName, lat, lng,
-      reportId: id, photoUrl: pubUrl,
+      reportId: id, photoUrl: pubUrl, sam: p.measurements,
     });
   }
 
@@ -193,6 +200,7 @@ export async function submitReport(input: SubmitInput): Promise<SubmitResult> {
     verifiedBy,
     modelsAgreed,
     transcript,
+    mentions,
     measurements: p.measurements,
     facesBlurred: p.facesBlurred,
     timingsMs: timings,
