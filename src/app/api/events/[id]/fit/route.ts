@@ -8,6 +8,7 @@ import { hasDb } from "@/lib/db/supabase.ts";
 import { checkVehicleFit } from "@/lib/fit/check.ts";
 import { CATEGORY_IDS } from "@/lib/fit/vehicles.ts";
 import { preparePhoto } from "@/lib/reports/processPhoto.ts";
+import { checkLimit, limitedResponse } from "@/lib/guard/rateLimit.ts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,6 +23,8 @@ const Sel = z.object({
 const bad = (error: string, status = 400) => NextResponse.json({ ok: false, error }, { status });
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const limited = checkLimit(req, "fit");
+  if (limited) return limitedResponse(limited);
   const { id } = await params;
   if (!z.uuid().safeParse(id).success) return bad("invalid event id");
   if (!hasDb()) return bad("database not configured", 503);

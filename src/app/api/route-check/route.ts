@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { checkRoute } from "@/lib/geo/check.ts";
 import { nearestPlace } from "@/lib/geo/snap.ts";
+import { checkLimit, limitedResponse } from "@/lib/guard/rateLimit.ts";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -22,6 +23,8 @@ const Body = z.object({
 });
 
 export async function POST(req: Request) {
+  const limited = checkLimit(req, "route");
+  if (limited) return limitedResponse(limited);
   const body = Body.safeParse(await req.json().catch(() => null));
   if (!body.success) return NextResponse.json({ ok: false, error: "from and to (\"lat,lng\") required" }, { status: 400 });
   const { from, to, fromName, toName, departAt } = body.data;

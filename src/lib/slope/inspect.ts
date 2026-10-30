@@ -31,9 +31,10 @@ export async function slopesToInspect(districtName: string | null): Promise<Slop
 }
 
 /** "Send crew to inspect": a timeline item only (no crew assignment, no status change). */
-export async function sendInspection(siteId: string, org: string, district: string | null): Promise<boolean> {
+export async function sendInspection(siteId: string, org: string, district: string | null, isDemo = false): Promise<boolean> {
   const site = await getSite(siteId);
-  if (!site) return false;
+  // The judges' demo account only writes on demo sites.
+  if (!site || (isDemo && !site.is_demo)) return false;
   const d = districtOf(district);
   if (kmBetween(d, site) > d.radiusKm) return false;
   await addHistory(site, { at: new Date().toISOString(), kind: "inspect", text: `${org} sent a crew to inspect the slope`, actor: org });

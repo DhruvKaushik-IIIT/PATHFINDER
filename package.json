@@ -41,7 +41,10 @@
     "test:scout": "node --env-file-if-exists=.env.local scripts/test-scout.ts",
     "test:share": "node --env-file-if-exists=.env.local scripts/test-share.ts",
     "test:time-check": "node --env-file-if-exists=.env.local scripts/test-time-check.ts",
-    "test:drive": "node scripts/test-drive.ts"
+    "test:drive": "node scripts/test-drive.ts",
+    "demo-reset": "node --env-file-if-exists=.env.local scripts/seed.ts && node --env-file-if-exists=.env.local scripts/create-official.ts",
+    "scan-secrets": "bash scripts/scan-secrets.sh",
+    "test:guard": "node --env-file-if-exists=.env.local scripts/test-guard.ts"
   },
   "dependencies": {
     "@meta-sam/parser": "^0.1.0",

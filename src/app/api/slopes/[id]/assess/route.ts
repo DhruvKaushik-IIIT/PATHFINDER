@@ -4,11 +4,14 @@ import { NextResponse } from "next/server";
 import { hasDb } from "@/lib/db/supabase.ts";
 import { assessSite } from "@/lib/slope/assess.ts";
 import { getSite } from "@/lib/slope/sites.ts";
+import { checkLimit, limitedResponse } from "@/lib/guard/rateLimit.ts";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const limited = checkLimit(req, "slope");
+  if (limited) return limitedResponse(limited);
   const { id } = await params;
   if (!hasDb()) return NextResponse.json({ ok: false, error: "database not configured" }, { status: 503 });
   const replay = new URL(req.url).searchParams.get("replay") === "1";

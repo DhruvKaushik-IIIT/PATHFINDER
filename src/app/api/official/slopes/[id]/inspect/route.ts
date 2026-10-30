@@ -10,7 +10,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   if (official instanceof NextResponse) return official;
   const { id } = await params;
   try {
-    const ok = await sendInspection(id, official.org, official.district.name);
+    const ok = await sendInspection(id, official.org, official.district.name, official.isDemo);
     return ok ? NextResponse.json({ ok: true, data: { sent: true } }) : NextResponse.json({ ok: false, error: "slope not found in your district" }, { status: 404 });
   } catch (err) {
     console.error("[official] inspect failed:", (err as Error).message);

@@ -11,6 +11,7 @@ import { findDuplicate, submitReport } from "@/lib/reports/submit.ts";
 import { assessSite } from "@/lib/slope/assess.ts";
 import { submitSlopeReport } from "@/lib/slope/submit.ts";
 import { roadWatchAfterChange } from "@/lib/watch/roadWatch.ts";
+import { checkLimit, limitedResponse } from "@/lib/guard/rateLimit.ts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,6 +33,8 @@ const Input = z.object({
 const bad = (error: string, status = 400) => NextResponse.json({ ok: false, error }, { status });
 
 export async function POST(req: Request) {
+  const limited = checkLimit(req, "report");
+  if (limited) return limitedResponse(limited);
   let form: FormData;
   try {
     form = await req.formData();

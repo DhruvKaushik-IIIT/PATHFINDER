@@ -63,7 +63,7 @@ async function loadEvent(official: Official, eventId: string): Promise<{ row: Ev
   if (!/^[0-9a-f-]{36}$/i.test(eventId)) return null;
   const [row] = await select<EventRow>(
     "events",
-    "select=id,type,status,place_name,lat,lng,summary,passable,eta_clear,last_confirmed_at,resolved_at,road_segments(road_ref,road_name)" +
+    "select=id,type,status,place_name,lat,lng,summary,passable,eta_clear,last_confirmed_at,resolved_at,is_demo,road_segments(road_ref,road_name)" +
       `&id=eq.${eventId}&limit=1`,
   );
   if (!row || row.resolved_at || kmBetween(row, official.district) > official.district.radiusKm) return null;
@@ -124,10 +124,12 @@ export async function advisoryDraft(official: Official, eventId: string): Promis
 
 export type PublishResult = { ok: true; sent: number } | { ok: false; status: number; error: string };
 
-export async function publishAdvisory(official: Official, eventId: string, en: string, hi: string): Promise<PublishResult> {
+export async function publishAdvisory(official: Official, eventId: string, en: string, hi: string, callerDevice: string | null = null): Promise<PublishResult> {
   const loaded = await loadEvent(official, eventId);
   if (!loaded) return { ok: false, status: 404, error: "Event not found in your district (or already cleared)." };
   const { row } = loaded;
+  if (official.isDemo && !(row as EventRow & { is_demo?: boolean }).is_demo)
+    return { ok: false, status: 403, error: "The demo account can publish for demo events only." };
 
   // Guard against double taps / spam: one advisory per event per 10 minutes.
   const since = new Date(Date.now() - REPUBLISH_MIN * 60_000).toISOString();
@@ -136,6 +138,11 @@ export async function publishAdvisory(official: Official, eventId: string, en: s
 
   const title = eventTitle(row.type, row.place_name);
   const w = await watchers(row);
+  // Demo account: alerts reach demo devices + the judge's own phone only, never real travellers.
+  if (official.isDemo && w.userIds.length) {
+    const demo = await select<{ id: string }>("users", `select=id&is_demo=is.true&id=in.(${w.userIds.join(",")})`);
+    w.userIds = w.userIds.filter((u) => u === callerDevice || demo.some((d) => d.id === u));
+  }
   if (w.userIds.length) {
     await insert(
       "alerts",

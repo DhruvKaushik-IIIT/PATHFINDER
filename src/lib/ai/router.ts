@@ -5,6 +5,7 @@
 import type OpenAI from "openai";
 import { APIConnectionError, APIConnectionTimeoutError, APIError } from "openai";
 import { insert, hasDb } from "../db/supabase.ts";
+import { noteSpend, overBudget } from "./budget.ts";
 import { client, hasKey, MODELS, type Provider } from "./clients.ts";
 import { readFileSync } from "node:fs";
 import { CLAIM_SYSTEM, claimUserText } from "./prompts/claim.ts";
@@ -187,10 +188,15 @@ interface CallLog {
   ok: boolean;
   fallbackUsed: boolean;
   errorKind?: ErrorKind;
+  /** HTTP status of a failed provider call (logs only). */
+  status?: number;
 }
 
 function logCall(entry: CallLog): void {
-  console.info("[ai]", JSON.stringify(entry));
+  noteSpend(entry.costUsd);
+  // Structured line for Vercel logs: provider, model, purpose, tokens, cost, error kind — never keys or photos.
+  if (entry.ok) console.info("[ai]", JSON.stringify(entry));
+  else console.warn("[ai]", JSON.stringify({ level: "warn", event: "ai_call_failed", ...entry }));
   if (!hasDb()) return;
   // Fire-and-forget: a logging failure must never break the job.
   insert("ai_calls", {
@@ -240,6 +246,13 @@ export async function runJob<T>(opts: {
     return { ok: true, data: opts.mock(), source: "mock" };
   }
 
+  // Global daily spend cap (Phase 6D): straight to the no-AI last resort, never an error.
+  const capped = await overBudget();
+  if (capped) {
+    console.warn(JSON.stringify({ level: "warn", event: "ai_budget_cap", purpose: opts.purpose }));
+    return { ok: true, data: opts.lastResort(capped), source: "none", degraded: capped };
+  }
+
   const reasons: string[] = [];
 
   for (const [i, a] of opts.attempts.entries()) {
@@ -275,7 +288,7 @@ export async function runJob<T>(opts: {
           at: new Date().toISOString(), purpose: opts.purpose, provider: a.provider, model: a.model,
           inputTokens: spent?.inputTokens ?? 0, outputTokens: spent?.outputTokens ?? 0,
           costUsd: spent ? estimateCost(a.model, spent) : null, latencyMs: Date.now() - started,
-          ok: false, fallbackUsed, errorKind: e.kind,
+          ok: false, fallbackUsed, errorKind: e.kind, ...(e.status && { status: e.status }),
         });
         if (e.tripBreaker) markDown(a.provider, `${e.kind}${e.status ? ` ${e.status}` : ""}: ${e.message}`);
         if (e.retry && attempt < RETRIES) {
