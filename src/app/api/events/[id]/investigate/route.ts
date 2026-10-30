@@ -5,11 +5,14 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { hasDb } from "@/lib/db/supabase.ts";
 import { investigateEvent } from "@/lib/investigate/investigator.ts";
+import { checkLimit, limitedResponse } from "@/lib/guard/rateLimit.ts";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
-export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
+export async function POST(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  const limited = checkLimit(req, "investigate");
+  if (limited) return limitedResponse(limited);
   const { id } = await params;
   if (!z.uuid().safeParse(id).success) return NextResponse.json({ ok: false, error: "invalid event id" }, { status: 400 });
   if (!hasDb()) return NextResponse.json({ ok: true, data: null, degraded: "database not configured" });

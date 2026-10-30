@@ -2,6 +2,7 @@
 // the verified claim (CLAUDE.md 6.2 rule 4). Drawn on the privacy-blurred copy and stored next to
 // it — the evidence photo itself is never altered. Look follows docs/design/glass-html/Photos.dc.html.
 import { decodeMaskToSVGPath } from "@meta-sam/parser";
+import "./fonts.ts"; // must run before sharp renders SVG text (Vercel has no system fonts)
 import sharp from "sharp";
 import type { Claim } from "../ai/schemas.ts";
 import type { ConceptResults, Range } from "./measure.ts";
@@ -17,7 +18,7 @@ const STATUS: Record<string, { bg: string; label: string }> = {
   unknown: { bg: "#D1D1D6", label: "Status unclear" },
 };
 
-const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
+export const esc = (s: string) => s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
 /** "~5 m" when the range is tight, "~3–8 m" when it isn't. */
 export function approx(r: Range | null | undefined, unit = "m"): string | null {
@@ -27,7 +28,7 @@ export function approx(r: Range | null | undefined, unit = "m"): string | null {
   return r.max - r.min <= Math.max(1, mid * 0.3) ? `~${fmt(mid)} ${unit}` : `~${fmt(r.min)}–${fmt(r.max)} ${unit}`;
 }
 
-function maskPaths(results: ConceptResults, concept: string, color: string, opacity: number): string[] {
+export function maskPaths(results: ConceptResults, concept: string, color: string, opacity: number): string[] {
   return (results[concept]?.masks ?? []).map((m) => {
     const { left, top, right, bottom } = m.bounds;
     const sx = (right - left) / m.record.mask.width;
@@ -37,7 +38,7 @@ function maskPaths(results: ConceptResults, concept: string, color: string, opac
 }
 
 /** Union bounds of all masks for the given concepts. */
-function bounds(results: ConceptResults, concepts: string[]) {
+export function bounds(results: ConceptResults, concepts: string[]) {
   let b: { left: number; top: number; right: number; bottom: number } | null = null;
   for (const c of concepts)
     for (const m of results[c]?.masks ?? []) {

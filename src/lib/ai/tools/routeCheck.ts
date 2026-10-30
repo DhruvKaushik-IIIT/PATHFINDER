@@ -4,6 +4,7 @@ import type OpenAI from "openai";
 import { z } from "zod";
 import { select } from "../../db/supabase.ts";
 import type { RoutePlan } from "../../geo/routeTypes.ts";
+import { sitesOnLine } from "../../slope/sites.ts";
 import { weatherAt } from "../../weather.ts";
 import { RouteVerdict } from "../schemas.ts";
 
@@ -166,6 +167,11 @@ export const ROUTE_CHECK_TOOLS: Tool[] = [
     "General operating rules for a pass or tunnel (Atal Tunnel, Rohtang, Jalori, Kunzum, Baralacha). Not live data.",
     obj({ place: { type: "string" } }, ["place"]),
   ),
+  fn(
+    "get_slope_risks",
+    "Slope Sentinel: hillsides above a route where travellers photographed warning signs (cracks, seepage, loose rocks), with level watch/elevated/high, reasons and rain. Advice only — it never closes a road.",
+    obj({ routeId: { type: "string" } }, ["routeId"]),
+  ),
   fn("submit_verdict", "Submit the final route verdict. Call exactly once, at the end.", submitSchema),
 ];
 
@@ -257,6 +263,15 @@ export async function runRouteCheckTool(ctx: RouteCheckContext, name: string, ra
       return estimate(plan, details, String(args.routeId), String(args.departAt));
     case "get_pass_timings":
       return { place: args.place, guidance: passTimings(String(args.place ?? "")) };
+    case "get_slope_risks": {
+      const r = plan.routes.find((x) => x.id === args.routeId) ?? plan.routes[0];
+      if (!r) return { error: "unknown routeId" };
+      const sites = await sitesOnLine(r.geometry.coordinates as [number, number][]).catch(() => []);
+      return {
+        sites: sites.map((x) => ({ place: x.place, road: x.road, km: x.km, level: x.level, reason: x.headline, advice: x.advice, rainMm24h: x.rain?.mm ?? null })),
+        note: "Warning signs, not a closure: the verdict stays based on road events; use slopes for timing advice (cross in daylight / before heavy rain, don't stop under it).",
+      };
+    }
     default:
       return { error: `unknown tool ${name}` };
   }

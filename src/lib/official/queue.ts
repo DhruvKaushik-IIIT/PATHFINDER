@@ -43,7 +43,7 @@ export async function rankedQueue(d: District, crews: CrewInfo[], now = Date.now
   const [w, s, e, n] = districtBbox(d);
   const rows = await select<Row>(
     "events",
-    `select=${EVENT_SELECT.replace("road_segments(road_ref,road_name)", "road_segments(road_ref,road_name,highway)")},measurements` +
+    `select=${EVENT_SELECT.replace("road_segments(road_ref,road_name)", "road_segments(road_ref,road_name,highway)")}` +
       `&resolved_at=is.null&lat=gte.${s}&lat=lte.${n}&lng=gte.${w}&lng=lte.${e}&limit=200`,
   );
   const items = rows

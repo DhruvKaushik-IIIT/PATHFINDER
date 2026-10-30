@@ -4,6 +4,7 @@
 import { Bell, Camera, ChevronRight, Eye, Layers, MapPin, Navigation, Route, Target, User } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Marker, type MapRef } from "react-map-gl/maplibre";
 import PlaceCard from "@/components/home/PlaceCard";
@@ -12,6 +13,8 @@ import Sheet from "@/components/glass/Sheet";
 import EventPeek from "@/components/map/EventPeek";
 import type { LatLng } from "@/components/map/MapView";
 import { useEvents } from "@/components/map/useEvents";
+import SlopeLayer from "@/components/map/SlopeLayer";
+import { useSlopes } from "@/components/map/useSlopes";
 import { useLocationPing } from "@/components/me/useLocationPing";
 import { STATUS_STYLE, type MapEvent, type NearbyResult } from "@/lib/events/types";
 import type { Place } from "@/lib/geo/placeTypes";
@@ -29,6 +32,8 @@ export default function HomeScreen() {
   const [showRoads, setShowRoads] = useState(true);
   const [locating, setLocating] = useState(false);
   const { events, refresh } = useEvents(mapRef);
+  const { slopes, refresh: refreshSlopes } = useSlopes(mapRef);
+  const router = useRouter();
   const [selected, setSelected] = useState<MapEvent | null>(null);
   const [searching, setSearching] = useState(false);
   const [picked, setPicked] = useState<Place | null>(null);
@@ -75,8 +80,12 @@ export default function HomeScreen() {
         events={events}
         selectedEventId={selected?.id ?? null}
         onSelectEvent={setSelected}
-        onViewChange={refresh}
+        onViewChange={() => {
+          refresh();
+          refreshSlopes();
+        }}
       >
+        <SlopeLayer pins={slopes} onSelect={(p) => router.push(`/slope/${p.id}`)} />
         {picked && (
           <Marker latitude={picked.lat} longitude={picked.lng} anchor="bottom">
             <MapPin size={34} strokeWidth={2} className="text-accent drop-shadow" fill="white" aria-label={picked.name} />

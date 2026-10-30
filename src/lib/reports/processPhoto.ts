@@ -7,6 +7,7 @@ import type { SamResult } from "../ai/sam.ts";
 import { measure, type ConceptResults, type PhotoMeasurements } from "../images/measure.ts";
 import { prepareImage } from "../images/prepare.ts";
 import { blurRegions, heavyBlurThumb } from "../images/privacy.ts";
+import { SLOPE_SAM_CONCEPTS } from "../slope/types.ts";
 
 export const PRIVACY_CONCEPTS = ["face", "license plate"] as const;
 // Phase 0 finding: "debris" finds nothing on real slides → "landslide" (whole slide) + "rock" (stones).
@@ -53,10 +54,19 @@ export async function preparePhoto(raw: Buffer): Promise<PreparedPhoto> {
   return { jpeg, width, height, sha256: sha256(jpeg) };
 }
 
-export async function processPhoto({ jpeg, width, height, sha256: hash }: PreparedPhoto): Promise<ProcessedPhoto> {
+/**
+ * kind "road" (default): privacy + road measurement concepts.
+ * kind "slope" (Phase 6B): privacy + slope concepts; no road measurement (signMetrics() works on `sam`).
+ */
+export async function processPhoto(
+  { jpeg, width, height, sha256: hash }: PreparedPhoto,
+  opts: { kind?: "road" | "slope" } = {},
+): Promise<ProcessedPhoto> {
   const degraded: string[] = [];
+  const slope = opts.kind === "slope";
+  const work: readonly string[] = slope ? SLOPE_SAM_CONCEPTS : MEASURE_CONCEPTS;
 
-  const concepts = [...PRIVACY_CONCEPTS, ...MEASURE_CONCEPTS];
+  const concepts = [...PRIVACY_CONCEPTS, ...work];
   const runs = await Promise.all(concepts.map((c) => segment(jpeg, c)));
   const samResults: ConceptResults = {};
   concepts.forEach((c, i) => (samResults[c] = runs[i]!.data));
@@ -77,8 +87,10 @@ export async function processPhoto({ jpeg, width, height, sha256: hash }: Prepar
     degraded.push("privacy check unavailable — photo kept private, only a blurred thumbnail is public");
   }
 
-  const measurements = measure(samResults, width, height);
-  if (MEASURE_CONCEPTS.some((c) => !samResults[c])) degraded.push("AI measurement unavailable right now");
+  const measurements: PhotoMeasurements = slope
+    ? { method: { reference: "none", notes: ["slope photo: no road measurement"] }, confidence: 0 }
+    : measure(samResults, width, height);
+  if (work.some((c) => !samResults[c])) degraded.push("AI measurement unavailable right now");
 
   const imgArea = width * height;
   const sam: SamSummary[] = concepts.map((c) => {
@@ -105,4 +117,15 @@ export async function processPhoto({ jpeg, width, height, sha256: hash }: Prepar
     samCostUsd: samCalls * SAM_COST_PER_IMAGE,
     degraded,
   };
+}
+
+/**
+ * Privacy pass only (Phase 6C vehicle photos): SAM face + license plate → blurred copy. null when SAM is
+ * unavailable — the caller must then NOT send the photo to any AI (ask the user to pick the vehicle instead).
+ */
+export async function privacyPass({ jpeg }: PreparedPhoto): Promise<{ jpeg: Buffer; blurred: number; samCostUsd: number } | null> {
+  const runs = await Promise.all(PRIVACY_CONCEPTS.map((c) => segment(jpeg, c)));
+  if (runs.some((r) => !r.data)) return null;
+  const boxes = runs.flatMap((r) => r.data!.boxes);
+  return { jpeg: await blurRegions(jpeg, boxes), blurred: boxes.length, samCostUsd: runs.filter((r) => r.source === "meta").length * SAM_COST_PER_IMAGE };
 }

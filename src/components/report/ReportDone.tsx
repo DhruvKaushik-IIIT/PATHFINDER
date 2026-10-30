@@ -13,6 +13,7 @@ import { TYPE_WORD } from "@/lib/events/types";
 import { LAST_REPORT_KEY } from "./storage";
 import { checkerSays } from "@/components/verification/ModelChecks";
 import { MODEL_NAME, type VerificationRecord } from "@/lib/verification/types";
+import SlopeDone, { type SlopeResult } from "./SlopeDone";
 
 const MapView = dynamic(() => import("@/components/map/MapView"), {
   ssr: false,
@@ -21,6 +22,7 @@ const MapView = dynamic(() => import("@/components/map/MapView"), {
 
 // The subset of POST /api/reports `data` this screen shows.
 interface Result {
+  kind?: "slope";
   lat: number;
   lng: number;
   reportStatus: "accepted" | "pending" | "rejected";
@@ -89,6 +91,7 @@ export default function ReportDone() {
     );
   }
   if (!result) return <main className="fixed inset-0 bg-land" />;
+  if (result.kind === "slope") return <SlopeDone result={result as unknown as SlopeResult} total={total} degraded={degraded} onToastClose={() => setDegraded(null)} />;
 
   const road = result.road?.ref ?? result.road?.name;
   const accepted = result.reportStatus === "accepted";
@@ -205,7 +208,7 @@ export default function ReportDone() {
   );
 }
 
-function Row({ label, value, last = false }: { label: string; value: string; last?: boolean }) {
+export function Row({ label, value, last = false }: { label: string; value: string; last?: boolean }) {
   return (
     <div className={`flex h-[42px] items-center justify-between gap-3 ${last ? "" : "border-b-[0.5px] border-[rgba(60,60,67,0.18)]"}`}>
       <span className="shrink-0 text-[14px] text-ink-2">{label}</span>
@@ -214,7 +217,7 @@ function Row({ label, value, last = false }: { label: string; value: string; las
   );
 }
 
-function friendly(degraded: string): string | null {
+export function friendly(degraded: string): string | null {
   if (/privacy check/.test(degraded)) return "Photo kept private until faces and plates can be blurred";
   if (/transcript unavailable/.test(degraded)) return "Voice note saved, transcript unavailable right now";
   if (/AI report unavailable/.test(degraded)) return "AI is busy — your report is saved for review";

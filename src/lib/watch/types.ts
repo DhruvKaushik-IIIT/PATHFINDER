@@ -54,6 +54,9 @@ export interface Alert {
     /** Official advisory (Command Centre): Hindi text + event. */
     advisory?: boolean;
     hi?: string;
+    /** Slope Sentinel (Phase 6B): a slope site on the trip rose to elevated/high. */
+    slopeSiteId?: string;
+    level?: string;
     eventId?: string;
     /** Scout request (Phase 5): answer with a photo at /report?scout=<requestId>. */
     requestId?: string;

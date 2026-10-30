@@ -13,6 +13,10 @@ import Sheet from "@/components/glass/Sheet";
 import Toast from "@/components/glass/Toast";
 import { ago, STATUS_STYLE, TYPE_WORD, type NearbyResult } from "@/lib/events/types";
 import RiskLayer from "@/components/map/RiskLayer";
+import SlopeLayer from "@/components/map/SlopeLayer";
+import { fetchSlopes } from "@/components/map/useSlopes";
+import SlopeRows from "@/components/slope/SlopeRows";
+import type { SlopePin } from "@/lib/slope/types";
 import { replayLabel, type AreaRisk } from "@/lib/risk/types";
 import { circle } from "./circle";
 
@@ -96,6 +100,22 @@ export default function NearbyScreen() {
       alive = false;
     };
   }, [center, radius, replay]);
+  // 4. Slope sites with warning signs inside the circle (no AI).
+  const [slopes, setSlopes] = useState<(SlopePin & { distanceKm: number })[]>([]);
+  useEffect(() => {
+    if (!center) return;
+    let alive = true;
+    const dLat = radius / 111;
+    const dLng = radius / (111 * Math.cos((center.lat * Math.PI) / 180));
+    fetchSlopes(center.lng - dLng, center.lat - dLat, center.lng + dLng, center.lat + dLat).then((pins) => {
+      if (!alive) return;
+      const km = (p: SlopePin) => Math.hypot((p.lat - center.lat) * 111, (p.lng - center.lng) * 111 * Math.cos((center.lat * Math.PI) / 180));
+      setSlopes(pins.map((p) => ({ ...p, distanceKm: km(p) })).filter((p) => p.distanceKm <= radius).sort((a, b) => a.distanceKm - b.distanceKm));
+    });
+    return () => {
+      alive = false;
+    };
+  }, [center, radius]);
   const riskOn = showRisk ?? (risk ? risk.level === "moderate" || risk.level === "high" : false);
 
   const fit = useCallback(() => {
@@ -131,6 +151,7 @@ export default function NearbyScreen() {
         showRoadLayer={false}
       >
         {riskOn && <RiskLayer id="pf-area-risk" areas={risk?.cells ?? []} />}
+        <SlopeLayer pins={slopes} onSelect={(p) => router.push(`/slope/${p.id}${replay ? "?replay=1" : ""}`)} />
         {center && (
           <Source id="pf-radius" type="geojson" data={circle(center.lat, center.lng, radius)}>
             <Layer id="pf-radius-fill" type="fill" paint={{ "fill-color": "#0071E3", "fill-opacity": 0.08 }} />
@@ -253,6 +274,12 @@ export default function NearbyScreen() {
                 </span>
               </button>
             )}
+
+            <SlopeRows
+              pins={slopes}
+              replay={replay}
+              sub={(p) => [`${(p.distanceKm ?? 0) < 1 ? "<1" : Math.round(p.distanceKm ?? 0)} km`, p.road, "warning signs, not a closure"].filter(Boolean).join(" · ")}
+            />
 
             {data.items.length > 0 ? (
               <ul className="m-0 list-none rounded-[16px] bg-white/[0.82] p-0">

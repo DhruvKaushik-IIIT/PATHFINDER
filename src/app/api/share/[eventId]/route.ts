@@ -4,11 +4,14 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { hasDb } from "@/lib/db/supabase.ts";
 import { cardFor } from "@/lib/share/card.ts";
+import { checkLimit, limitedResponse } from "@/lib/guard/rateLimit.ts";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 90;
 
 export async function POST(req: Request, { params }: { params: Promise<{ eventId: string }> }) {
+  const limited = checkLimit(req, "image");
+  if (limited) return limitedResponse(limited);
   const { eventId } = await params;
   if (!z.uuid().safeParse(eventId).success) return NextResponse.json({ ok: false, error: "invalid event id" }, { status: 400 });
   if (!hasDb()) return NextResponse.json({ ok: true, data: null, degraded: "database not configured" });

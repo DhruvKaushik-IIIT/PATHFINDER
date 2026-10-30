@@ -5,6 +5,7 @@ import { z } from "zod";
 import { approveDispatch } from "@/lib/official/approve.ts";
 import { requireOfficial } from "@/lib/official/guard.ts";
 import { dispatchPlan } from "@/lib/official/planDispatch.ts";
+import { checkLimit } from "@/lib/guard/rateLimit.ts";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 120;
@@ -12,9 +13,12 @@ export const maxDuration = 120;
 export async function GET(req: Request) {
   const official = await requireOfficial();
   if (official instanceof NextResponse) return official;
-  const ai = new URL(req.url).searchParams.get("ai") === "1";
+  const limited = new URL(req.url).searchParams.get("ai") === "1" ? checkLimit(req, "official") : null;
+  const ai = new URL(req.url).searchParams.get("ai") === "1" && !limited;
   try {
-    const { plan, degraded } = await dispatchPlan(official.district, official.org, { ai });
+    const { plan, degraded: d } = await dispatchPlan(official.district, official.org, { ai });
+    // Over the limit: the instant code plan instead of the agent.
+    const degraded = limited ? limited.message : d;
     return NextResponse.json({ ok: true, data: plan, ...(degraded && { degraded }) });
   } catch (err) {
     console.error("[official] dispatch plan failed:", (err as Error).message);

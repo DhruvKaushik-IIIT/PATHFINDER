@@ -4,6 +4,7 @@
 import { NextResponse } from "next/server";
 import { checkFieldPhoto, FieldError } from "@/lib/official/fieldUpdate.ts";
 import { requireOfficial } from "@/lib/official/guard.ts";
+import { checkLimit, limitedResponse } from "@/lib/guard/rateLimit.ts";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -11,6 +12,8 @@ export const maxDuration = 60;
 const MAX_PHOTO_BYTES = 15 * 1024 * 1024;
 
 export async function POST(req: Request) {
+  const limited = checkLimit(req, "official");
+  if (limited) return limitedResponse(limited);
   const official = await requireOfficial();
   if (official instanceof NextResponse) return official;
   const form = await req.formData().catch(() => null);

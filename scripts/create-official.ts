@@ -8,9 +8,9 @@
 //   (or set OFFICIAL_PASSWORD instead of --password so it stays out of shell history)
 import { hasDb, supabaseUrl } from "../src/lib/db/supabase.ts";
 import { DISTRICTS } from "../src/lib/official/districts.ts";
-import { deptEmail } from "../src/lib/official/dept.ts";
+import { DEMO_OFFICIAL, deptEmail } from "../src/lib/official/dept.ts";
 
-const DEMO = { dept: "PWD-MANDI-DEMO", name: "PWD Mandi (demo)", district: "Mandi", role: "official", password: "himachal-demo" };
+const DEMO = DEMO_OFFICIAL;
 
 const arg = (k: string) => process.argv.find((a) => a.startsWith(`--${k}=`))?.slice(k.length + 3);
 const dept = arg("dept") ?? DEMO.dept;
