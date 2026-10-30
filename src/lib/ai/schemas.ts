@@ -235,3 +235,54 @@ export const SlopeRisk = z.object({
   recheckInHours: z.number().min(1).max(72),
 });
 export type SlopeRisk = z.infer<typeof SlopeRisk>;
+
+// ---------------------------------------------------------------- Vehicle fit (Phase 6C)
+
+export const VEHICLE_CATEGORIES = ["bike", "small_car", "hatch_sedan", "suv", "mpv", "van", "pickup", "bus", "truck"] as const;
+export const FIT_VERDICTS = ["fits", "tight", "wont_fit", "unknown"] as const;
+
+/** What a model sees in a photo of the traveller's own vehicle. Real dimensions come from the spec table, not from this. */
+export const VehicleId = z.object({
+  isVehicle: z.boolean(),
+  make: z.string().nullable(),
+  model: z.string().nullable(),
+  category: z.enum(VEHICLE_CATEGORIES),
+  /** One of the ids given in the prompt, or null when the model isn't in the list. */
+  matchedVehicleId: z.string().nullable(),
+  confidence: z.number().min(0).max(1),
+  roofLoad: z.boolean(),
+  roofLoadHeightM: z.object({ min: z.number(), max: z.number() }).nullable(),
+  extras: z.array(z.string()).max(6).describe("e.g. roof carrier, bike rack, wide mirrors, trailer, lowered"),
+  loadedHeavily: z.boolean().nullable(),
+});
+export type VehicleId = z.infer<typeof VehicleId>;
+
+export const FIT_FACTOR_KINDS = ["width", "ground_clearance", "surface", "edge_drop", "overhead", "length_turning", "water", "other"] as const;
+
+/** Side-by-side reading of the road photo(s) + the vehicle, written by one model. */
+export const FitAssessment = z.object({
+  factors: z
+    .array(z.object({ kind: z.enum(FIT_FACTOR_KINDS), verdict: z.enum(["ok", "caution", "problem", "unknown"]), detail: z.string() }))
+    .min(1)
+    .max(7),
+  /** The model's view; code only lets it LOWER the code verdict. */
+  suggestedVerdict: z.enum(FIT_VERDICTS),
+  overallAdvice: z.string().describe("2–3 short practical sentences"),
+  // Checked in code, not as a JSON-schema pattern (a pattern steers constrained decoding into a 1-letter answer).
+  overallAdviceHi: z
+    .string()
+    .refine((s) => (s.match(/[ऀ-ॿ]/g)?.length ?? 0) >= 15, "must be Hindi in Devanagari script")
+    .describe("the same advice in simple Hindi, Devanagari script"),
+  confidence: z.number().min(0).max(1),
+  reasoning: z.string(),
+});
+export type FitAssessment = z.infer<typeof FitAssessment>;
+
+/** Independent check of a FitAssessment by a second model. */
+export const FitCheck = z.object({
+  verdict: z.enum(["agree", "adjust", "disagree"]),
+  suggestedVerdict: z.enum(FIT_VERDICTS),
+  confidence: z.number().min(0).max(1),
+  reasoning: z.string(),
+});
+export type FitCheck = z.infer<typeof FitCheck>;

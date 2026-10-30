@@ -118,3 +118,14 @@ export async function processPhoto(
     degraded,
   };
 }
+
+/**
+ * Privacy pass only (Phase 6C vehicle photos): SAM face + license plate → blurred copy. null when SAM is
+ * unavailable — the caller must then NOT send the photo to any AI (ask the user to pick the vehicle instead).
+ */
+export async function privacyPass({ jpeg }: PreparedPhoto): Promise<{ jpeg: Buffer; blurred: number; samCostUsd: number } | null> {
+  const runs = await Promise.all(PRIVACY_CONCEPTS.map((c) => segment(jpeg, c)));
+  if (runs.some((r) => !r.data)) return null;
+  const boxes = runs.flatMap((r) => r.data!.boxes);
+  return { jpeg: await blurRegions(jpeg, boxes), blurred: boxes.length, samCostUsd: runs.filter((r) => r.source === "meta").length * SAM_COST_PER_IMAGE };
+}

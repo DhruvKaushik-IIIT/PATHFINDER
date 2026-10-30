@@ -19,7 +19,9 @@ import { INVESTIGATE_SYSTEM, investigateUserText } from "./prompts/investigate.t
 import { SLOPE_CHECK_SYSTEM, SLOPE_SYSTEM, slopeCheckUserText, slopeUserText } from "./prompts/slope.ts";
 import { SLOPE_RISK_SYSTEM, slopeRiskUserText } from "./prompts/slopeRisk.ts";
 import { runSlopeTool, SLOPE_TOOLS, type SlopeToolContext } from "./tools/slope.ts";
-import { SlopeCheck, SlopeReading, SlopeRisk } from "./schemas.ts";
+import { SlopeCheck, SlopeReading, SlopeRisk, FitAssessment, FitCheck, VehicleId } from "./schemas.ts";
+import { VEHICLE_SYSTEM, vehicleUserText } from "./prompts/vehicle.ts";
+import { FIT_CHECK_SYSTEM, FIT_SYSTEM, fitCheckUserText, fitUserText } from "./prompts/fit.ts";
 import { Advisory, ClaimSet, DispatchProposal, Investigation, jsonSchemaFormat, NearbySummary, NewsItems, parseJson, RouteVerdict, Verdict, type Claim } from "./schemas.ts";
 import { DISPATCH_TOOLS, runDispatchTool, type DispatchContext } from "./tools/dispatch.ts";
 import { INVESTIGATE_TOOLS, runInvestigateTool, type InvestigateContext } from "./tools/investigate.ts";
@@ -931,6 +933,65 @@ export function assessSlopeRisk(ctx: SlopeToolContext, trigger: string): Promise
     mock: () => ({ risk: null, by: "mock", trace: [] }),
     lastResort: () => ({ risk: null, by: "code", trace: [] }),
   });
+}
+
+// ---------------------------------------------------------------- Vehicle fit (Phase 6C)
+
+/** Photo of the traveller's own vehicle (privacy-blurred) → VehicleId. Baseten → Meta Spark → null (ask the user to pick). */
+export function identifyVehicle(jpeg: Buffer, list: { id: string; name: string }[]): Promise<JobResult<{ id: VehicleId; by: Provider | "mock" } | null>> {
+  const content: ChatContent = [{ type: "text", text: vehicleUserText(list) }, imagePart(jpeg)];
+  const attempt = (provider: Provider, model: string): Attempt<{ id: VehicleId; by: Provider | "mock" } | null> => ({
+    provider,
+    model,
+    run: async (c) => {
+      const { data, usage } = await chatJson(c, provider, model, { name: "vehicle", schema: VehicleId, system: VEHICLE_SYSTEM, content });
+      return { data: { id: data, by: provider }, usage };
+    },
+  });
+  return runJob({
+    purpose: "identify_vehicle",
+    attempts: [attempt("baseten", MODELS.sparkOpen), attempt("meta", MODELS.spark)],
+    mock: () => ({
+      id: { isVehicle: true, make: "Toyota", model: "Innova Crysta", category: "mpv", matchedVehicleId: "toyota-innova-crysta", confidence: 0.8, roofLoad: false, roofLoadHeightM: null, extras: [], loadedHeavily: null },
+      by: "mock",
+    }),
+    lastResort: () => null,
+  });
+}
+
+/** ONE multi-image call: road photo(s) + vehicle photo + code numbers → FitAssessment. Baseten → Meta Spark → null (code only). */
+export function assessFit(roadJpegs: Buffer[], vehicleJpeg: Buffer | null, facts: unknown): Promise<JobResult<{ a: FitAssessment; by: Provider | "mock" } | null>> {
+  const content: ChatContent = [{ type: "text", text: fitUserText(facts) }, ...roadJpegs.map(imagePart), ...(vehicleJpeg ? [imagePart(vehicleJpeg)] : [])];
+  const attempt = (provider: Provider, model: string): Attempt<{ a: FitAssessment; by: Provider | "mock" } | null> => ({
+    provider,
+    model,
+    run: async (c) => {
+      const { data, usage } = await chatJson(c, provider, model, { name: "fit_assessment", schema: FitAssessment, system: FIT_SYSTEM, content });
+      return { data: { a: data, by: provider }, usage };
+    },
+  });
+  return runJob({
+    purpose: "assess_fit",
+    attempts: [attempt("baseten", MODELS.sparkOpen), attempt("meta", MODELS.spark)],
+    mock: () => null,
+    lastResort: () => null,
+  });
+}
+
+/** Independent check by a different model (Meta Spark → Baseten). null → "1 model". */
+export function checkFit(roadJpegs: Buffer[], vehicleJpeg: Buffer | null, assessment: FitAssessment, facts: unknown, avoid: Provider | "mock"): Promise<JobResult<{ c: FitCheck; by: Provider | "mock" } | null>> {
+  const content: ChatContent = [{ type: "text", text: fitCheckUserText(assessment, facts) }, ...roadJpegs.map(imagePart), ...(vehicleJpeg ? [imagePart(vehicleJpeg)] : [])];
+  const attempt = (provider: Provider, model: string): Attempt<{ c: FitCheck; by: Provider | "mock" } | null> => ({
+    provider,
+    model,
+    run: async (c) => {
+      const { data, usage } = await chatJson(c, provider, model, { name: "fit_check", schema: FitCheck, system: FIT_CHECK_SYSTEM, content });
+      return { data: { c: data, by: provider }, usage };
+    },
+  });
+  // The checker must be a DIFFERENT model from the writer, else it isn't a second opinion.
+  const attempts = [attempt("meta", MODELS.spark), attempt("baseten", MODELS.sparkOpen)].filter((a) => a.provider !== avoid);
+  return runJob({ purpose: "check_fit", attempts, mock: () => null, lastResort: () => null });
 }
 
 export const IMAGE_COST = 0.01; // Muse Image per image (5.4)

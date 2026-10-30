@@ -19,6 +19,8 @@ import RiskLayer from "@/components/map/RiskLayer";
 import SlopeLayer from "@/components/map/SlopeLayer";
 import { fetchSlopes } from "@/components/map/useSlopes";
 import SlopeRows from "@/components/slope/SlopeRows";
+import FitPill from "@/components/fit/FitPill";
+import { loadSavedVehicle, type SavedVehicle } from "@/lib/fit/saved";
 import { cumulative, project, type Coord } from "@/lib/drive/line";
 import type { SlopePin } from "@/lib/slope/types";
 import { replayLabel, type RouteRisk } from "@/lib/risk/types";
@@ -101,6 +103,10 @@ export default function RouteScreen() {
       alive = false;
     };
   }, [from, to, fromName, toName, depart, query, replay]);
+
+  // Saved vehicle (Phase 6C, this device only) → "Your Innova: fits / tight / won't fit" on disruption rows.
+  const [vehicle, setVehicle] = useState<SavedVehicle | null>(null);
+  useEffect(() => setVehicle(loadSavedVehicle()), []);
 
   // Slope sites with warning signs along the routes (Phase 6B, no AI): advice, never a closure.
   const [slopes, setSlopes] = useState<SlopePin[]>([]);
@@ -330,6 +336,7 @@ export default function RouteScreen() {
                           {eventTitle(e.type, e.placeName)} <span className="sr-only">({st.word})</span>
                         </span>
                         <span className="line-clamp-2 text-[13px] text-ink-2">{sub}</span>
+                        {vehicle && <FitPill vehicle={vehicle} event={e} />}
                       </span>
                       <ChevronRight size={15} strokeWidth={2.6} className="shrink-0 text-unknown" aria-hidden />
                     </Link>

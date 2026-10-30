@@ -2,7 +2,7 @@
 
 // Frame 05 Disruption detail (docs/design/glass-html/Disruption.dc.html): tall sheet over the map.
 // Big numbers first (stat tiles), evidence below (photo, sources, timeline). Every number is "~".
-import { Check, CircleHelp, Clock, Image as ImageIcon, Newspaper, ScanSearch, Share2, ShieldCheck, TrendingUp, X } from "lucide-react";
+import { CarFront, Check, CircleHelp, Clock, Image as ImageIcon, Newspaper, ScanSearch, Share2, ShieldCheck, TrendingUp, X } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -168,6 +168,16 @@ export default function EventScreen({ id }: { id: string }) {
                 </span>
               ))}
             </div>
+
+            {/* Phase 6C: vehicle-fit check (closed = "for when it reopens to one lane") */}
+            {["one_lane", "slow", "closed"].includes(ev.status) && !["traffic", "accident", "closure_notice"].includes(ev.type) && (
+              <Link
+                href={`/event/${ev.id}/fit`}
+                className="flex min-h-[44px] shrink-0 items-center justify-center gap-2 rounded-[14px] bg-accent-tint text-[15px] font-semibold text-accent-tint-ink no-underline"
+              >
+                <CarFront size={17} aria-hidden /> Check if my vehicle can cross
+              </Link>
+            )}
 
             {/* what's happening, in English + Hindi */}
             {ev.summary && (
