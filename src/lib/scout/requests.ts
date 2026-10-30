@@ -28,6 +28,8 @@ export interface ScoutRequest {
   fulfilled_by_report_id: string | null;
   created_at: string;
   is_demo: boolean;
+  /** Phase 6B: a request for a newer photo of a slope site (instead of the road event on the segment). */
+  slope_site_id?: string | null;
 }
 
 interface Target {
@@ -38,9 +40,10 @@ interface Target {
   lat: number;
   lng: number;
   last_confirmed_at: string;
+  slope?: boolean;
 }
 
-const COLS = "id,segment_id,question,demand_count,sent_to,fulfilled_by_report_id,created_at,is_demo";
+const COLS = "id,segment_id,question,demand_count,sent_to,fulfilled_by_report_id,created_at,is_demo,slope_site_id";
 const hoursSince = (iso: string) => (Date.now() - new Date(iso).getTime()) / 3_600_000;
 
 /** One open request per segment: asking again raises its demand instead of adding a row. */
@@ -48,7 +51,7 @@ export async function ensureRequest(segmentId: string, question: string, opts: {
   const since = new Date(Date.now() - REQUEST_TTL_H * 3_600_000).toISOString();
   const [open] = await select<ScoutRequest>(
     "scout_requests",
-    `select=${COLS}&segment_id=eq.${encodeURIComponent(segmentId)}&fulfilled_by_report_id=is.null&created_at=gte.${since}&order=created_at.desc&limit=1`,
+    `select=${COLS}&segment_id=eq.${encodeURIComponent(segmentId)}&slope_site_id=is.null&fulfilled_by_report_id=is.null&created_at=gte.${since}&order=created_at.desc&limit=1`,
   );
   const demand = opts.demand ?? 1;
   if (open) {
@@ -60,8 +63,29 @@ export async function ensureRequest(segmentId: string, question: string, opts: {
   return row!;
 }
 
-/** The open event a request is about (requests are per segment). null → nothing left to photograph. */
+/** One open request per slope site (Phase 6B): rain is coming and nobody has photographed the slope lately. */
+export async function ensureSlopeRequest(site: { id: string; segment_id: string | null; is_demo?: boolean }, question: string): Promise<ScoutRequest> {
+  const since = new Date(Date.now() - REQUEST_TTL_H * 3_600_000).toISOString();
+  const [open] = await select<ScoutRequest>(
+    "scout_requests",
+    `select=${COLS}&slope_site_id=eq.${site.id}&fulfilled_by_report_id=is.null&created_at=gte.${since}&order=created_at.desc&limit=1`,
+  );
+  if (open) return open;
+  const [row] = await insert<ScoutRequest>("scout_requests", {
+    segment_id: site.segment_id, slope_site_id: site.id, question: question.slice(0, 160), demand_count: 1, is_demo: site.is_demo ?? false,
+  });
+  return row!;
+}
+
+/** The open event a request is about (requests are per segment), or the slope site. null → nothing left to photograph. */
 async function targetOf(req: ScoutRequest): Promise<Target | null> {
+  if (req.slope_site_id) {
+    const [site] = await select<{ id: string; place_name: string | null; lat: number; lng: number; last_observed_at: string | null; created_at: string; risk_level: string }>(
+      "slope_sites",
+      `select=id,place_name,lat,lng,last_observed_at,created_at,risk_level&id=eq.${req.slope_site_id}`,
+    );
+    return site ? { id: site.id, type: "slope", status: site.risk_level, place_name: site.place_name, lat: site.lat, lng: site.lng, last_confirmed_at: site.last_observed_at ?? site.created_at, slope: true } : null;
+  }
   if (!req.segment_id) return null;
   const [ev] = await select<Target>(
     "events",
@@ -101,6 +125,19 @@ export const isStationary = (speed: number | null | undefined) => speed == null 
 async function sendTo(req: ScoutRequest, ev: Target, user: ScoutUser): Promise<void> {
   const km = Math.max(1, Math.round(kmBetween({ lat: user.coarse_lat, lng: user.coarse_lng }, ev)));
   const n = (await watchers(ev)).userIds.filter((id) => id !== user.id).length;
+  if (ev.slope) {
+    // Phase 6B: a newer photo of the hillside above the road.
+    await insert("alerts", {
+      user_id: user.id,
+      kind: "scout_request",
+      title: "Can you photograph a slope?",
+      body: `${req.question} You're ~${km} km away. Only when safely stopped, and never stand under the slope.`,
+      data: { requestId: req.id, slopeSiteId: ev.id, title: `Slope near ${ev.place_name ?? "the road"}`, question: req.question, lat: ev.lat, lng: ev.lng, km, url: `/report?mode=slope&site=${ev.id}&scout=${req.id}` },
+    });
+    req.sent_to = [...req.sent_to, user.id];
+    await update("scout_requests", `id=eq.${req.id}`, { sent_to: req.sent_to });
+    return;
+  }
   const h = Math.round(hoursSince(ev.last_confirmed_at));
   const place = ev.place_name ?? "a road near you";
   const who = n > 0 ? `${n} ${n === 1 ? "traveller is" : "travellers are"} watching trips through ${place}` : `Travellers need fresh info on ${place}`;

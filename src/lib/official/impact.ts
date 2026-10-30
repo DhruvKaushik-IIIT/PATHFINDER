@@ -14,6 +14,8 @@ const VEHICLES_PER_DAY: Record<string, number> = {
   track: 60,
 };
 
+export const vehiclesPerDayOf = (highway: string | null | undefined) => VEHICLES_PER_DAY[highway ?? ""] ?? 400;
+
 /** Hours each passing vehicle loses (closed = wait or detour). */
 const DELAY_H: Record<EventStatus, number> = { closed: 2, one_lane: 0.33, slow: 0.15, unknown: 0.1, open: 0 };
 

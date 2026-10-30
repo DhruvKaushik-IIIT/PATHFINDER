@@ -20,6 +20,10 @@ export interface MapEvent {
   modelsAgreed: number | null;
   photoUrl: string | null;
   etaClear?: { earliest: string; latest: string } | null;
+  /** Road width left open (m), from SAM — for "Can my vehicle cross?" pills. */
+  gapM?: { min: number; max: number } | null;
+  /** Newest photo of the spot (ISO). */
+  photoAt?: string | null;
 }
 
 // CLAUDE.md 7.2 — status is ALWAYS word + colour.

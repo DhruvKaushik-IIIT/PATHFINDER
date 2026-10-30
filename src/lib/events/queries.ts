@@ -16,7 +16,8 @@ export interface EventRow {
   models_agreed: number | null;
   eta_clear: { earliest: string; latest: string } | null;
   road_segments: { road_ref: string | null; road_name: string | null } | null;
-  photos: { annotated_url: string | null; public_url: string | null }[];
+  photos: { annotated_url: string | null; public_url: string | null; created_at?: string }[];
+  measurements?: { roadWidthLeftM?: { min: number; max: number } | null; [k: string]: unknown } | null;
 }
 
 /** Throws on database errors; callers decide how to degrade. */
@@ -32,7 +33,7 @@ export async function openEventsInBbox(w: number, s: number, e: number, n: numbe
 
 export const EVENT_SELECT =
   "id,type,status,place_name,lat,lng,summary,confidence,last_confirmed_at,sources,models_agreed,eta_clear," +
-  "road_segments(road_ref,road_name),photos(annotated_url,public_url)";
+  "road_segments(road_ref,road_name),photos(annotated_url,public_url,created_at),measurements";
 
 export function toMapEvent(r: EventRow): MapEvent {
   return {
@@ -51,5 +52,8 @@ export function toMapEvent(r: EventRow): MapEvent {
     modelsAgreed: r.models_agreed,
     etaClear: r.eta_clear,
     photoUrl: r.photos.find((p) => p.annotated_url)?.annotated_url ?? r.photos[0]?.public_url ?? null,
+    // Vehicle-fit pills (Phase 6C): the measured gap + when the newest photo was taken.
+    gapM: r.measurements?.roadWidthLeftM ?? null,
+    photoAt: r.photos.reduce<string | null>((a, p) => (p.created_at && (!a || p.created_at > a) ? p.created_at : a), null),
   };
 }

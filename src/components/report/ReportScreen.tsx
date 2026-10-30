@@ -13,6 +13,14 @@ import { MAX_SECONDS, startRecording, type Recorder, type WavRecording } from "@
 
 import { LAST_REPORT_KEY } from "./storage";
 
+const SLOPE_STEPS = [
+  "Blurring faces and number plates",
+  "Finding water, rocks and scars with SAM 3.1",
+  "Reading the slope · Muse Spark Open",
+  "Second look · Muse Spark",
+  "Updating the slope site",
+];
+
 const STEPS = [
   "Blurring faces and number plates",
   "Measuring the road with SAM 3.1",
@@ -23,8 +31,16 @@ const STEPS = [
 
 type Loc = { lat: number; lng: number };
 
+type Mode = "photo" | "slope";
+
 export default function ReportScreen() {
   const router = useRouter();
+  // Phase 6B: "Slope" mode — the hillside above the road (/report?mode=slope[&site=…] from a slope page or scout request).
+  const [mode, setMode] = useState<Mode>("photo");
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("mode") === "slope") setMode("slope");
+  }, []);
+  const steps = mode === "slope" ? SLOPE_STEPS : STEPS;
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [camera, setCamera] = useState<"starting" | "on" | "off">("starting");
@@ -78,6 +94,15 @@ export default function ReportScreen() {
         }
       },
       () => {
+        // Opened from a slope page (?site=…&lat&lng): the photo can still be placed at that site.
+        const q = new URLSearchParams(window.location.search);
+        const lat = Number(q.get("lat"));
+        const lng = Number(q.get("lng"));
+        if (q.get("site") && Number.isFinite(lat) && Number.isFinite(lng) && lat && lng) {
+          setLoc({ lat, lng });
+          setLocLabel("At the slope from the link");
+          return;
+        }
         setLocError(true);
         setLocLabel("Turn on location to report");
       },
@@ -89,9 +114,9 @@ export default function ReportScreen() {
   useEffect(() => {
     if (!sending) return;
     setStep(0);
-    const t = setInterval(() => setStep((s) => Math.min(STEPS.length - 1, s + 1)), 4000);
+    const t = setInterval(() => setStep((s) => Math.min(steps.length - 1, s + 1)), 4000);
     return () => clearInterval(t);
-  }, [sending]);
+  }, [sending, steps.length]);
 
   useEffect(() => {
     if (!recording) return;
@@ -137,6 +162,7 @@ export default function ReportScreen() {
     const scout = new URLSearchParams(window.location.search).get("scout");
     if (scout) form.append("scout", scout);
     if (taken) form.append("takenAt", taken);
+    if (mode === "slope") form.append("kind", "slope");
     try {
       const res = await fetch("/api/reports", { method: "POST", body: form });
       const body = (await res.json()) as { ok: boolean; error?: string };
@@ -193,8 +219,8 @@ export default function ReportScreen() {
         </span>
       </div>
 
-      <p className="absolute inset-x-0 top-[130px] z-10 text-center text-[15px] font-semibold [text-shadow:0_1px_4px_rgba(0,0,0,0.5)]">
-        Fit the whole blockage in the frame
+      <p className="absolute inset-x-6 top-[130px] z-10 text-center text-[15px] font-semibold [text-shadow:0_1px_4px_rgba(0,0,0,0.5)]">
+        {mode === "slope" ? "Point the camera at the hillside above the road. Only when safely stopped." : "Fit the whole blockage in the frame"}
       </p>
       {/* viewfinder corners */}
       <div aria-hidden className="pointer-events-none absolute inset-x-10 top-[300px] bottom-[244px] mx-auto max-w-[420px]">
@@ -213,22 +239,24 @@ export default function ReportScreen() {
       {/* bottom: dark glass controls */}
       <div className="glass-dark absolute inset-x-[14px] bottom-7 z-10 mx-auto flex max-w-[452px] flex-col items-center gap-4 rounded-[30px] px-[22px] pb-5 pt-4">
         <div className="flex gap-1 rounded-2xl bg-white/12 p-[3px]" role="radiogroup" aria-label="Report mode">
-          {/* TODO(phase-5): Video and Drive & Map modes (stretch). */}
-          {(["Video", "Photo", "Drive"] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              role="radio"
-              aria-checked={m === "Photo"}
-              aria-disabled={m !== "Photo"}
-              onClick={() => m !== "Photo" && setToast(`${m} reports are coming soon — send a photo for now`)}
-              className={`h-[30px] rounded-[13px] px-[14px] text-[13px] font-semibold ${
-                m === "Photo" ? "bg-white/90 text-ink" : "text-white/60"
-              }`}
-            >
-              {m}
-            </button>
-          ))}
+          {/* Video and Drive & Map modes were cut in Phase 5 (cut order). */}
+          {(["Video", "Photo", "Slope", "Drive"] as const).map((m) => {
+            const live = m === "Photo" || m === "Slope";
+            const on = (m === "Photo" && mode === "photo") || (m === "Slope" && mode === "slope");
+            return (
+              <button
+                key={m}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                aria-disabled={!live}
+                onClick={() => (live ? setMode(m === "Slope" ? "slope" : "photo") : setToast(`${m} reports are coming soon — send a photo for now`))}
+                className={`h-[30px] rounded-[13px] px-[13px] text-[13px] font-semibold ${on ? "bg-white/90 text-ink" : live ? "text-white" : "text-white/60"}`}
+              >
+                {m}
+              </button>
+            );
+          })}
         </div>
 
         <div className="flex w-full items-center justify-between">
@@ -304,10 +332,10 @@ export default function ReportScreen() {
       {sending && (
         <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/45 px-6" role="alertdialog" aria-label="Sending report">
           <div className="glass-dark w-full max-w-[360px] rounded-[24px] p-5">
-            <p className="text-[17px] font-semibold">Checking your report…</p>
+            <p className="text-[17px] font-semibold">{mode === "slope" ? "Checking the slope…" : "Checking your report…"}</p>
             <p className="mt-1 text-[13px] text-[#D1D1D6]">Usually 15–25 seconds. Keep this screen open.</p>
             <ol className="mt-4 flex flex-col gap-2.5">
-              {STEPS.map((s, i) => (
+              {steps.map((s, i) => (
                 <li key={s} className={`flex items-center gap-2.5 text-[14px] ${i <= step ? "text-white" : "text-white/40"}`}>
                   <span
                     className={`size-2 shrink-0 rounded-full ${i < step ? "bg-[#5AD39C]" : i === step ? "animate-pulse bg-white" : "bg-white/30"}`}

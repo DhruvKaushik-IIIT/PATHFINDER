@@ -6,6 +6,7 @@ import { z } from "zod";
 import { FieldError, postFieldUpdate } from "@/lib/official/fieldUpdate.ts";
 import { requireOfficial } from "@/lib/official/guard.ts";
 import { roadWatchAfterChange } from "@/lib/watch/roadWatch.ts";
+import { checkLimit, limitedResponse } from "@/lib/guard/rateLimit.ts";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -22,6 +23,8 @@ const Fields = z.object({
 });
 
 export async function POST(req: Request) {
+  const limited = checkLimit(req, "official");
+  if (limited) return limitedResponse(limited);
   const official = await requireOfficial();
   if (official instanceof NextResponse) return official;
   const form = await req.formData().catch(() => null);

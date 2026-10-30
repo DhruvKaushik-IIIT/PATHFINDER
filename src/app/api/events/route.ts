@@ -16,7 +16,8 @@ export async function GET(req: Request) {
   if (!parsed.success) return NextResponse.json({ ok: false, error: "bbox=W,S,E,N required" }, { status: 400 });
   if (!hasDb()) return NextResponse.json({ ok: true, data: [], degraded: "database not configured" });
   try {
-    return NextResponse.json({ ok: true, data: await openEventsInBbox(...parsed.data) });
+    // Public map data: a short CDN cache absorbs many phones panning the same area (Phase 6E).
+    return NextResponse.json({ ok: true, data: await openEventsInBbox(...parsed.data) }, { headers: { "Cache-Control": "public, s-maxage=20, stale-while-revalidate=40" } });
   } catch (err) {
     console.error("[events] query failed:", (err as Error).message);
     return NextResponse.json({ ok: true, data: [], degraded: "events unavailable right now" });

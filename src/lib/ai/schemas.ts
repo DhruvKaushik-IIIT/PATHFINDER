@@ -179,3 +179,110 @@ export const Investigation = z.object({
   scoutQuestion: z.string().nullable().describe("if a fresh photo would settle it: one short question for a traveller nearby, else null"),
 });
 export type Investigation = z.infer<typeof Investigation>;
+
+// ---------------------------------------------------------------- Slope Sentinel (Phase 6B)
+
+export const SLOPE_SIGN_KINDS = [
+  "tension_crack", "wall_crack", "wall_bulge", "seepage", "fresh_rockfall", "leaning_trees",
+  "fresh_scar", "undercut_toe", "loose_overhang", "other",
+] as const;
+export const SLOPE_OVERALL = ["none", "minor", "concerning", "severe"] as const;
+
+/** What a model reads from a photo of the hillside above a road (warning signs, not a prediction). */
+export const SlopeReading = z.object({
+  /** False for a road surface, selfie, sky, … → the observation is rejected. */
+  isSlopePhoto: z.boolean(),
+  signs: z
+    .array(
+      z.object({
+        kind: z.enum(SLOPE_SIGN_KINDS),
+        severity: z.enum(["minor", "moderate", "major"]),
+        looksFresh: z.boolean().nullable(),
+        aboveRoad: z.boolean().nullable(),
+        note: z.string().describe("short: where in the photo and what it looks like"),
+      }),
+    )
+    .max(8),
+  overall: z.enum(SLOPE_OVERALL),
+  confidence: z.number().min(0).max(1),
+  summary: z.string().describe("one plain-English sentence"),
+  summaryHi: z.string().describe("the same sentence in Hindi (Devanagari)"),
+  reasoning: z.string(),
+});
+export type SlopeReading = z.infer<typeof SlopeReading>;
+
+/** Independent second look at a SlopeReading. */
+export const SlopeCheck = z.object({
+  verdict: z.enum(["agree", "downgrade", "reject"]),
+  /** Only for "downgrade": the level the checker would give instead. */
+  correctedOverall: z.enum(SLOPE_OVERALL).nullable(),
+  /** Sign kinds from the reading the checker could not see in the photo. */
+  disputedSigns: z.array(z.enum(SLOPE_SIGN_KINDS)).max(8),
+  confidence: z.number().min(0).max(1),
+  reasoning: z.string(),
+});
+export type SlopeCheck = z.infer<typeof SlopeCheck>;
+
+export const SLOPE_RISK_LEVELS = ["none", "watch", "elevated", "high"] as const;
+
+/** Slope risk agent output (code then applies caps before it is stored). */
+export const SlopeRisk = z.object({
+  level: z.enum(SLOPE_RISK_LEVELS),
+  confidence: z.number().min(0).max(1),
+  reasons: z.array(z.string()).min(1).max(5).describe("short evidence lines a traveller can check"),
+  advice: z.string().describe("one or two sentences for travellers: when to cross, where not to stop"),
+  adviceHi: z.string().describe("the same advice in Hindi (Devanagari)"),
+  recheckInHours: z.number().min(1).max(72),
+});
+export type SlopeRisk = z.infer<typeof SlopeRisk>;
+
+// ---------------------------------------------------------------- Vehicle fit (Phase 6C)
+
+export const VEHICLE_CATEGORIES = ["bike", "small_car", "hatch_sedan", "suv", "mpv", "van", "pickup", "bus", "truck"] as const;
+export const FIT_VERDICTS = ["fits", "tight", "wont_fit", "unknown"] as const;
+
+/** What a model sees in a photo of the traveller's own vehicle. Real dimensions come from the spec table, not from this. */
+export const VehicleId = z.object({
+  isVehicle: z.boolean(),
+  make: z.string().nullable(),
+  model: z.string().nullable(),
+  category: z.enum(VEHICLE_CATEGORIES),
+  /** One of the ids given in the prompt, or null when the model isn't in the list. */
+  matchedVehicleId: z.string().nullable(),
+  confidence: z.number().min(0).max(1),
+  roofLoad: z.boolean(),
+  roofLoadHeightM: z.object({ min: z.number(), max: z.number() }).nullable(),
+  extras: z.array(z.string()).max(6).describe("e.g. roof carrier, bike rack, wide mirrors, trailer, lowered"),
+  loadedHeavily: z.boolean().nullable(),
+});
+export type VehicleId = z.infer<typeof VehicleId>;
+
+export const FIT_FACTOR_KINDS = ["width", "ground_clearance", "surface", "edge_drop", "overhead", "length_turning", "water", "other"] as const;
+
+/** Side-by-side reading of the road photo(s) + the vehicle, written by one model. */
+export const FitAssessment = z.object({
+  factors: z
+    .array(z.object({ kind: z.enum(FIT_FACTOR_KINDS), verdict: z.enum(["ok", "caution", "problem", "unknown"]), detail: z.string() }))
+    .min(1)
+    .max(7),
+  /** The model's view; code only lets it LOWER the code verdict. */
+  suggestedVerdict: z.enum(FIT_VERDICTS),
+  overallAdvice: z.string().describe("2–3 short practical sentences"),
+  // Checked in code, not as a JSON-schema pattern (a pattern steers constrained decoding into a 1-letter answer).
+  overallAdviceHi: z
+    .string()
+    .refine((s) => (s.match(/[ऀ-ॿ]/g)?.length ?? 0) >= 15, "must be Hindi in Devanagari script")
+    .describe("the same advice in simple Hindi, Devanagari script"),
+  confidence: z.number().min(0).max(1),
+  reasoning: z.string(),
+});
+export type FitAssessment = z.infer<typeof FitAssessment>;
+
+/** Independent check of a FitAssessment by a second model. */
+export const FitCheck = z.object({
+  verdict: z.enum(["agree", "adjust", "disagree"]),
+  suggestedVerdict: z.enum(FIT_VERDICTS),
+  confidence: z.number().min(0).max(1),
+  reasoning: z.string(),
+});
+export type FitCheck = z.infer<typeof FitCheck>;

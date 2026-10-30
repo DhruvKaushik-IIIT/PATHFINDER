@@ -23,15 +23,16 @@ export default function LoginScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
+  async function submit(e: React.FormEvent | null, demo = false) {
+    e?.preventDefault();
     setBusy(true);
     setError(null);
     try {
-      const res = await fetch("/api/official/login", {
+      // Demo: one tap for judges (public read-mostly account); otherwise the typed Department ID + password.
+      const res = await fetch(demo ? "/api/official/demo" : "/api/official/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ deptId, password }),
+        body: demo ? "{}" : JSON.stringify({ deptId, password }),
       });
       const j = (await res.json()) as { ok: boolean; error?: string };
       if (j.ok) {
@@ -113,9 +114,17 @@ export default function LoginScreen() {
           <p className="m-0 text-center text-[13px] leading-[1.4] text-ink-2">
             Invite only — there is no public sign-up. Ask your district admin for an account.
           </p>
-          <p className="m-0 rounded-[12px] bg-accent-tint px-[14px] py-[10px] text-[13px] leading-[1.45] text-accent-tint-ink">
-            <strong>Demo account:</strong> Department ID <span className="whitespace-nowrap font-mono">PWD-MANDI-DEMO</span>, password{" "}
-            <span className="whitespace-nowrap font-mono">himachal-demo</span>. It sees demo data for Mandi district.
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void submit(null, true)}
+            className="flex min-h-[48px] items-center justify-center rounded-[14px] bg-accent-tint text-[16px] font-semibold text-accent-tint-ink disabled:opacity-60"
+          >
+            Try as PWD Mandi (demo)
+          </button>
+          <p className="m-0 text-center text-[12px] leading-[1.45] text-ink-2">
+            Demo account <span className="whitespace-nowrap font-mono">PWD-MANDI-DEMO</span> / <span className="whitespace-nowrap font-mono">himachal-demo</span>: demo data for Mandi
+            district only — its advisories reach demo devices and your own phone, never real travellers.
           </p>
         </div>
       </form>

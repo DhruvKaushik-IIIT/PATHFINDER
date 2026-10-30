@@ -13,6 +13,7 @@ import Sheet from "@/components/glass/Sheet";
 import Toast from "@/components/glass/Toast";
 import RiskLayer from "@/components/map/RiskLayer";
 import DispatchCard from "./DispatchCard";
+import SlopesToInspect from "./SlopesToInspect";
 import { eventTitle, STATUS_STYLE } from "@/lib/events/types";
 import { hoursText, roughCount, type CommandCentre, type QueueItem } from "@/lib/official/types";
 import type { AreaRisk } from "@/lib/risk/types";
@@ -225,6 +226,8 @@ export default function CommandCentreScreen() {
           {cc && cc.queue.length > 0 && (
             <DispatchCard version={version} advisoryEventId={cc.queue[0]!.event.id} onApproved={onApproved} onMessage={setToast} />
           )}
+
+          {cc && <SlopesToInspect onMessage={setToast} />}
 
           <p className="m-0 px-1 text-center text-[12px] leading-[1.4] text-ink-3">
             Impact = vehicles reaching each spot before it clears × time each loses (estimates from road class, status and ETA)

@@ -50,9 +50,12 @@ async function loadEvent(official: Official, eventId: string): Promise<EventRow>
   if (!/^[0-9a-f-]{36}$/i.test(eventId)) throw new FieldError("invalid event id");
   const [row] = await select<EventRow>(
     "events",
-    `select=id,type,status,place_name,lat,lng,confidence,passable,measurements,sources&id=eq.${eventId}&resolved_at=is.null&limit=1`,
+    `select=id,type,status,place_name,lat,lng,confidence,passable,measurements,sources,is_demo&id=eq.${eventId}&resolved_at=is.null&limit=1`,
   );
   if (!row || kmBetween(row, official.district) > official.district.radiusKm) throw new FieldError("Event not found in your district (or already cleared).", 404);
+  // Judges' demo account (Phase 6D): it may change demo events only, never real reports (`pnpm seed` resets them).
+  if (official.isDemo && !(row as EventRow & { is_demo?: boolean }).is_demo)
+    throw new FieldError("The demo account can update demo events only — this one is a real report.", 403);
   return row;
 }
 

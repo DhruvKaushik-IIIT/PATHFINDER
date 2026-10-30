@@ -16,6 +16,12 @@
     "test:tools-baseten": "node --env-file-if-exists=.env.local scripts/test-tools-baseten.ts",
     "test:vision": "node --env-file-if-exists=.env.local scripts/test-vision.ts",
     "test:sam": "node --env-file-if-exists=.env.local scripts/test-sam.ts",
+    "test:slope-sam": "node --env-file-if-exists=.env.local scripts/test-slope-sam.ts",
+    "test:slope": "node scripts/test-slope.ts",
+    "test:fit": "node scripts/test-fit.ts",
+    "test:fit-live": "node --env-file-if-exists=.env.local scripts/test-fit-live.ts",
+    "test:slope-live": "node --env-file-if-exists=.env.local scripts/test-slope-live.ts",
+    "seed-slopes": "node --env-file-if-exists=.env.local scripts/seed-slopes.ts",
     "test:voice": "node --env-file-if-exists=.env.local scripts/test-voice.ts",
     "test:pipeline": "node --env-file-if-exists=.env.local scripts/test-pipeline.ts",
     "test:claim": "node --env-file-if-exists=.env.local scripts/test-claim.ts",
@@ -34,7 +40,11 @@
     "test:investigator": "node --env-file-if-exists=.env.local scripts/test-investigator.ts",
     "test:scout": "node --env-file-if-exists=.env.local scripts/test-scout.ts",
     "test:share": "node --env-file-if-exists=.env.local scripts/test-share.ts",
-    "test:time-check": "node --env-file-if-exists=.env.local scripts/test-time-check.ts"
+    "test:time-check": "node --env-file-if-exists=.env.local scripts/test-time-check.ts",
+    "test:drive": "node scripts/test-drive.ts",
+    "demo-reset": "node --env-file-if-exists=.env.local scripts/seed.ts && node --env-file-if-exists=.env.local scripts/create-official.ts",
+    "scan-secrets": "bash scripts/scan-secrets.sh",
+    "test:guard": "node --env-file-if-exists=.env.local scripts/test-guard.ts"
   },
   "dependencies": {
     "@meta-sam/parser": "^0.1.0",

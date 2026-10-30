@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { hasDb } from "@/lib/db/supabase.ts";
 import { nearby, RADII_KM } from "@/lib/events/nearby.ts";
+import { checkLimit } from "@/lib/guard/rateLimit.ts";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
@@ -21,8 +22,11 @@ export async function GET(req: Request) {
   if (!q.success) return NextResponse.json({ ok: false, error: "lat, lng and radiusKm (5/10/25/50) required" }, { status: 400 });
   const { lat, lng, radiusKm, name, summary } = q.data;
   if (!hasDb()) return NextResponse.json({ ok: true, data: null, degraded: "database not configured" });
+  // Over the limit: the ranked list + the code-written summary (no AI) instead of an error.
+  const limited = summary === "1" ? checkLimit(req, "nearby") : null;
   try {
-    const data = await nearby(lat, lng, radiusKm, { name, summary: summary === "1" });
+    const data = await nearby(lat, lng, radiusKm, { name, summary: summary === "1" && !limited });
+    if (limited) return NextResponse.json({ ok: true, data, degraded: limited.message });
     return NextResponse.json({ ok: true, data, ...(summary === "1" && data.summaryBy === "code" && data.items.length > 0 && { degraded: "AI summary unavailable right now" }) });
   } catch (err) {
     console.error("[nearby] failed:", (err as Error).message);

@@ -290,5 +290,28 @@ export async function areaRisk(lat: number, lng: number, radiusKm: number, opts:
   return { level, cells, headline, ...base };
 }
 
+/** Rain/snow at one point over the next `hours` (Slope Sentinel). Throws if the forecast is unreachable. */
+export async function pointRisk(
+  lat: number,
+  lng: number,
+  hours = 24,
+  opts: { replay?: boolean } = {},
+): Promise<RiskStats & { level: RiskLevel; kind: "rain" | "snow"; source: "forecast" | "replay"; replayDate?: string; wettestAt: string | null }> {
+  const d = 0.03;
+  const [series, slides] = await Promise.all([
+    opts.replay ? Promise.resolve(replaySeries([{ lat, lng }])) : liveSeries([{ lat, lng }]),
+    slideHistory(lng - d, lat - d, lng + d, lat + d),
+  ]);
+  const s = series[0]!;
+  const now = Date.now();
+  const st = stats(s, now - H, now + hours * H, slidesNear(slides, lat, lng));
+  let wettest = -1;
+  let wettestAt: string | null = null;
+  s.t.forEach((t, i) => {
+    if (t >= now - H && t <= now + hours * H && s.rain[i]! > wettest && s.rain[i]! >= 1) [wettest, wettestAt] = [s.rain[i]!, new Date(t).toISOString()];
+  });
+  return { ...st, ...levelOf(st), source: opts.replay ? "replay" : "forecast", replayDate: opts.replay ? loadReplay()?.date : undefined, wettestAt };
+}
+
 /** For scripts/test-risk.ts (scoring without the network). */
 export const _internal = { stats, toSeries };

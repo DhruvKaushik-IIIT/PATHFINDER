@@ -168,7 +168,7 @@ const fromNow = (h: number) => new Date(Date.now() + h * 3_600_000).toISOString(
 
 if (process.argv.includes("--wipe")) {
   // Children first; events cascade to their timeline.
-  for (const t of ["alerts", "scout_requests", "watched_trips", "news_items", "official_updates", "crews", "claims", "photos", "reports", "event_timeline", "events", "users"]) {
+  for (const t of ["alerts", "slope_observations", "scout_requests", "slope_sites", "watched_trips", "news_items", "official_updates", "crews", "claims", "photos", "reports", "event_timeline", "events", "users"]) {
     await req("DELETE", `${t}?is_demo=eq.true`);
     console.log(`wiped demo rows from ${t}`);
   }

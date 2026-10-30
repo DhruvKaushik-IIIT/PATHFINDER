@@ -24,6 +24,7 @@ const KIND_WORD: Record<Alert["kind"], string> = { road_watch: "Road Watch", sco
 function dotFor(a: Alert): string {
   if (a.kind === "scout_request") return "#0A84FF";
   if (a.data?.advisory) return "#0071E3";
+  if (a.data?.slopeSiteId) return "#7B5CD6";
   if (a.data?.verdict) return VERDICT_STYLE[a.data.verdict].dot;
   return "#8E8E93";
 }
@@ -121,7 +122,7 @@ export default function AlertsScreen() {
                 <article key={a.id} className="flex flex-col gap-[10px] rounded-[18px] bg-white/[0.86] p-4">
                   <span className="flex items-center gap-[7px] text-[12px] font-bold uppercase tracking-[0.4px] text-ink-2">
                     <span className="size-2 rounded-full" style={{ background: dotFor(a) }} />
-                    {a.data?.advisory ? "Official advisory" : KIND_WORD[a.kind]} · {ago(a.createdAt)}
+                    {a.data?.advisory ? "Official advisory" : a.data?.slopeSiteId && a.kind === "road_watch" ? "Slope Sentinel" : KIND_WORD[a.kind]} · {ago(a.createdAt)}
                   </span>
                   <span className="text-[18px] font-bold leading-[1.25]">{a.title}</span>
                   {a.body && <span className="text-[15px] leading-[1.45] text-[#3A3A3C]">{a.body}</span>}
@@ -153,7 +154,7 @@ export default function AlertsScreen() {
                       href={a.data.url}
                       className="flex h-11 items-center justify-center rounded-[12px] bg-accent text-[16px] font-semibold text-white no-underline"
                     >
-                      {a.data.advisory ? "See details" : "See new plan"}
+                      {a.data.advisory ? "See details" : a.data.slopeSiteId ? "See the slope" : "See new plan"}
                     </Link>
                   )}
                 </article>
