@@ -2,6 +2,7 @@
 // reading, on the privacy-blurred copy (6.2 rule 4: the evidence photo is never altered).
 // Signs SAM can place (water, rocks, slide scar) get a label on the mask; signs only the model sees
 // (cracks, bulges, leaning trees…) are listed as chips above the bottom strip — we never invent a position.
+import "./fonts.ts"; // must run before sharp renders SVG text (Vercel has no system fonts)
 import sharp from "sharp";
 import type { SlopeReading } from "../ai/schemas.ts";
 import { SIGN_LABEL } from "../slope/types.ts";

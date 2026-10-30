@@ -9,6 +9,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import SlopeLayer from "@/components/map/SlopeLayer";
+import SheetMessage from "@/components/glass/SheetMessage";
 import { ago } from "@/lib/events/types";
 import { keptSigns } from "@/lib/slope/metrics";
 import { SIGN_LABEL, SLOPE_STYLE, SLOPE_WORD, SLOPE_WORD_HI, type SlopeObservation, type SlopeSite } from "@/lib/slope/types";
@@ -89,7 +90,12 @@ export default function SlopeScreen({ id, replay }: { id: string; replay: boolea
 
       <section aria-label="Slope detail" className="glass absolute inset-x-0 bottom-0 top-[112px] z-10 mx-auto flex max-w-[480px] flex-col gap-[14px] overflow-y-auto rounded-t-[30px] px-[18px] pb-6 pt-2">
         <span aria-hidden className="h-[5px] w-[38px] shrink-0 self-center rounded-[3px] bg-[rgba(60,60,67,0.3)]" />
-        {error && <p className="py-8 text-center text-[15px] text-ink-2">{error}</p>}
+        {error && (
+          <SheetMessage
+            title={/not found/i.test(error) ? "This slope isn't being watched" : "Couldn't load this slope"}
+            body={/not found/i.test(error) ? "The link may be old. Slopes with warning signs show as purple markers on the map." : "Check your connection and try again."}
+          />
+        )}
         {!d && !error && (
           <div className="flex flex-col gap-3" aria-busy>
             <span className="h-7 w-52 animate-pulse rounded-lg bg-black/10" />

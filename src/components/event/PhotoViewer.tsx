@@ -86,6 +86,11 @@ export default function PhotoViewer({
         />
       )}
       {error && <p className="absolute inset-x-0 top-1/2 text-center text-[15px] text-[#D1D1D6]">{error}</p>}
+      {!loaded && !error && (
+        <p className="absolute inset-x-0 top-1/2 animate-pulse text-center text-[15px] text-[#D1D1D6]" role="status">
+          Loading photos…
+        </p>
+      )}
       {loaded && !photo && <p className="absolute inset-x-0 top-1/2 text-center text-[15px] text-[#D1D1D6]">{emptyText}</p>}
 
       {/* top: back · 1 of N · share */}
@@ -166,7 +171,7 @@ export default function PhotoViewer({
                   style={k === i ? { outline: "2.5px solid #FFFFFF", outlineOffset: "-2.5px" } : undefined}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element -- small thumbnail */}
-                  <img src={p.publicUrl ?? ""} alt="" className="size-full object-cover" />
+                  <img src={p.publicUrl ?? ""} alt="" loading="lazy" decoding="async" className="size-full object-cover" />
                   {more && <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-[14px] font-bold">+{photos.length - 4}</span>}
                 </button>
               );

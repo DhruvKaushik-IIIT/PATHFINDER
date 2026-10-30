@@ -16,7 +16,7 @@ export async function GET(req: Request) {
   if (!parsed.success) return NextResponse.json({ ok: false, error: "bbox=W,S,E,N required" }, { status: 400 });
   if (!hasDb()) return NextResponse.json({ ok: true, data: [], degraded: "database not configured" });
   try {
-    return NextResponse.json({ ok: true, data: (await sitesInBbox(...parsed.data)).map(toPin) });
+    return NextResponse.json({ ok: true, data: (await sitesInBbox(...parsed.data)).map(toPin) }, { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=120" } });
   } catch (err) {
     console.error("[slopes] query failed:", (err as Error).message);
     return NextResponse.json({ ok: true, data: [], degraded: "slope sites unavailable right now" });

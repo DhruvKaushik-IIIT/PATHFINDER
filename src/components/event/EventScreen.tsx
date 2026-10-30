@@ -12,6 +12,7 @@ import { ago, STATUS_STYLE, type EventDetail, type InvestigationSummary } from "
 import { eventTitle } from "@/components/route/routeData";
 import CrewCard from "@/components/repairs/CrewCard";
 import ModelChecks from "@/components/verification/ModelChecks";
+import SheetMessage from "@/components/glass/SheetMessage";
 import type { Repair } from "@/lib/repairs/types";
 
 const MapView = dynamic(() => import("@/components/map/MapView"), {
@@ -84,7 +85,12 @@ export default function EventScreen({ id }: { id: string }) {
       >
         <span aria-hidden className="h-[5px] w-[38px] shrink-0 self-center rounded-[3px] bg-[rgba(60,60,67,0.3)]" />
 
-        {error && <p className="py-8 text-center text-[15px] text-ink-2">{error}</p>}
+        {error && (
+          <SheetMessage
+            title={/not found/i.test(error) ? "This road report has cleared or doesn't exist" : "Couldn't load this report"}
+            body={/not found/i.test(error) ? "It may have been resolved since the link was shared. The map shows what's open right now." : "Check your connection and try again."}
+          />
+        )}
         {!ev && !error && (
           <div className="flex flex-col gap-3" aria-busy>
             <span className="h-7 w-52 animate-pulse rounded-lg bg-black/10" />

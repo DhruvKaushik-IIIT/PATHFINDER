@@ -313,7 +313,7 @@ export default function FitScreen({ id }: { id: string }) {
                   {report.evidence.photos.map((p) => (
                     <Link key={p.url} href={`/event/${report.eventId}/photos`} className="relative h-[72px] flex-1 overflow-hidden rounded-[10px] bg-[#3D4245]">
                       {/* eslint-disable-next-line @next/next/no-img-element -- Supabase public URL */}
-                      <img src={p.url} alt="Road photo used for this check" className="size-full object-cover" />
+                      <img src={p.url} alt="Road photo used for this check" loading="lazy" decoding="async" className="size-full object-cover" />
                       <span className="absolute bottom-1 left-1 rounded-[6px] bg-black/55 px-1.5 py-px text-[11px] font-semibold text-white">{p.ageH < 1 ? "<1 h" : `${Math.round(p.ageH)} h`} old</span>
                     </Link>
                   ))}

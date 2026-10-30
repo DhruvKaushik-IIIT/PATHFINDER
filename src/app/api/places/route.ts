@@ -7,5 +7,5 @@ export const dynamic = "force-dynamic";
 export async function GET(req: Request) {
   const q = (new URL(req.url).searchParams.get("q") ?? "").slice(0, 80);
   const { places, degraded } = await searchPlaces(q);
-  return NextResponse.json({ ok: true, data: places, ...(degraded && { degraded }) });
+  return NextResponse.json({ ok: true, data: places, ...(degraded && { degraded }) }, degraded ? undefined : { headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" } });
 }
