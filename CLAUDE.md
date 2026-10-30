@@ -619,11 +619,70 @@ _Schedule shifted by one day on Oct 28 (Phase 0 started late). Deploy to Vercel 
 3. **Scout requests** (demand × data gap → nearby opted-in, stationary users → alert) + `/me` (frame 12) with points, badges, leaderboard, settings.
 4. Share alert card with **Muse Image** (`/share/[eventId]`, frame 11).
 5. Dual-model verification UI ("2 AI models agree") + agreement stats (Baseten claim vs Meta verifier, already wired in Phase 1).
-6. Stretch: Drive & Map (frame 10c), Time-consistency check, Official notice (PDF) reader.
+6. Stretch: Time-consistency check, Official notice (PDF) reader.
 **Done when:** Must items work; stretch only if time remains.
 
-### Phase 6 — Real data, polish, deploy (Tue Nov 3 evening → Wed Nov 4 morning)
-Real photos in seed, bug bash on phone, loading/error/empty states, performance (image sizes, caching), deploy to Vercel + Supabase prod, README (setup, architecture diagram, which Meta models do what, what was built during the hackathon). Last day for organiser questions.
+### Phase 6 — Navigation handoff, Drive Watch, production hardening, deploy (Tue Nov 3)
+**Part A:** Start in Google Maps + Drive Watch · **Part B:** production hardening · **Part C:** real data, polish, deploy, ship-ready repo. Same gating as every phase: STOP after each Part and wait for "continue".
+
+Pitch line (use in UI copy + README): **"Pathfinder decides the safe route, Google Maps drives it."**
+Pathfinder does NOT do turn-by-turn navigation. Don't build rerouting, lane guidance or turn prompts.
+
+#### Design consistency (applies to ALL of Phase 6)
+- Everything new must match the existing "Pathfinder Glass" design already used in the app: frosted-glass surfaces, map-first layout with draggable bottom sheets, phone-first sizing, same typography, colours, corner radii, shadows, spacing and icon style.
+- Reuse the existing design tokens and shared components (buttons, sheets, banners, pills, alert cards). Don't hardcode new colours or fonts, and don't introduce a new UI library.
+- Check the exported design files referenced in this file before building. Drive Watch is based on frame 10c, so follow that frame's layout, scoped down to the Phase 6A features.
+- The Start / Open in Apple Maps / Drive Watch buttons on /route must look like they were always part of frame 03, using the same button hierarchy (primary vs secondary).
+- Hazard-ahead and Road Watch banners in Drive Watch use the existing alert styles (same severity colours as the rest of the app). Make them large and readable at a glance while driving: bigger text and tap targets, high contrast over the map.
+- Loading, error and empty states (Part C) and the demo login button (Part B) use the same Glass styling, not default browser or library styles.
+- Light and dark mode must both work if the app already supports both.
+- After building each new screen, compare it side by side with an existing screen and fix any visual mismatch before saying the part is done.
+
+#### Part A — Start in Google Maps + Drive Watch
+1. **"Start" button** on the route result screen (/route, frame 03), primary action.
+   - Opens a Google Maps directions deep link:
+     `https://www.google.com/maps/dir/?api=1&origin=LAT,LNG&destination=LAT,LNG&waypoints=LAT,LNG|LAT,LNG&travelmode=driving`
+   - Waypoints are sampled from Pathfinder's CHOSEN route geometry so Google follows the same safe route (for example, when Pathfinder avoids a blocked patch, the waypoints must force the detour). Choose waypoints at the key decision points where the safe route leaves the default one, not evenly spaced.
+   - Check Google's Maps URLs docs for the waypoint limit (mobile browsers allow fewer waypoints than desktop). Use the smallest set that still forces the route, and URL-encode it.
+   - Pure code: no AI call, no Google API key needed.
+   - Secondary option in a small menu: "Open in Apple Maps" (`maps.apple.com/?saddr=...&daddr=...&dirflg=d`). Apple's URL doesn't reliably support waypoints, so show a small note: "Apple Maps may choose a different road. Check Pathfinder alerts."
+   - Show the button for every route, including all-clear routes and Delhi → Himachal routes (Google handles the non-HP part).
+   - Next to Start, add a secondary button: "Drive Watch" (see 2).
+2. **Drive Watch mode** (`/drive`, scoped-down version of frame 10c, Glass style, phone-first). Runs ALONGSIDE Google Maps (split screen or switching apps), or on its own.
+   - Live GPS dot following the chosen route (`navigator.geolocation.watchPosition`, high accuracy), map auto-follows, shows distance remaining on the route.
+   - Screen Wake Lock API (`navigator.wakeLock.request('screen')`) so the phone doesn't sleep. Re-acquire it on `visibilitychange`. If unsupported, fall back to a hidden looping muted video (NoSleep-style) and show a small "Keep screen on" hint. Note for UI copy: on iPhone the PWA can't track GPS when the screen is locked, so keep the screen on.
+   - Hazard-ahead alerts: compute distance ALONG the route (not straight-line) to every event on the route ahead of the user. When one is within 5 km (and again at 1 km), show a banner and speak it with the Web Speech API (`speechSynthesis`), for example:
+     - EN: "Debris, one lane open, 4 kilometres ahead near Aut tunnel."
+     - HI: same message in Hindi (hi-IN voice).
+     Language follows the app language setting. If no hi-IN voice exists on the device, fall back to English and show the Hindi text on screen. iOS needs a user gesture before speech works, so the "Start Drive Watch" tap must unlock speechSynthesis (speak a short "Drive Watch on" line). Don't repeat the same alert: track announced event IDs per threshold.
+   - Road Watch alerts arrive live during the drive (Supabase realtime or polling every 30–60 s). A new or changed event on the route triggers a banner + voice.
+   - Big "End drive" button. Release the wake lock and stop the GPS watch on exit.
+   - Demo mode: `?simulate=1` replays a fake GPS track along the route at high speed so the hazard alerts can be shown in the demo video without actually driving. Clearly mark it as simulated in the UI.
+   - No turn-by-turn instructions.
+
+**Done when (A):** Delhi → Manali shows Start → Google Maps opens following Pathfinder's safe route; Drive Watch in simulate mode speaks "debris X km ahead" in EN and HI and shows a live Road Watch alert; all new UI matches the Glass design. → STOP. Wait for "continue".
+
+#### Part B — Production hardening
+1. **Production env vars:** list every required variable (Meta, Baseten, Supabase URL/anon/service, cron secret, etc.) in `.env.example` (names only, no values) and in the README. Give the user a checklist of exactly which ones to add in Vercel → Project Settings → Environment Variables. Scan the repo + git history for leaked keys (e.g. gitleaks or a grep for key patterns). Report findings; don't print any secret values.
+2. **Cron jobs on Vercel:** `vercel.json` crons for news ingest and Road Watch re-check, protected by a `CRON_SECRET` header check. Keep within Vercel Hobby plan cron limits (check the current limits and adjust the frequency; document the trade-off).
+3. **Demo login for judges:** a "Try as PWD Mandi (demo)" button on `/official/login` that signs into a read-mostly demo official account. Demo actions must not delete or corrupt seed data (or there's a reset script). Keep real official accounts invite-only.
+4. **Rate limit / budget guard** on every AI endpoint (report, route check, investigator, advisory, image, transcription): per-IP + per-user limits, and a global daily spend cap. When the cap is hit, use the existing code-only fallback from the provider router so the app degrades gracefully and never crashes. The "limit reached" message uses Glass styling.
+5. **Error monitoring:** structured server logs readable in Vercel logs. Wrap AI/provider calls so failures log the provider, model and error code (never keys or user photos). Sentry free tier only if it takes under 30 minutes; otherwise skip it.
+
+**Done when (B):** build passes with prod env, crons are configured and secured, demo login works, hitting the rate limit returns a friendly message, no secrets in the repo. → STOP. Wait for "continue".
+
+#### Part C — Real data, polish, deploy, ship-ready repo
+1. Real photos in the seed data (stripped EXIF, faces and number plates blurred as in Phase 1).
+2. Loading, error and empty states on every screen, in Glass styling. Bug fixes from the user's phone testing.
+3. Performance: image sizes/compression, caching, lazy-load heavy map layers.
+4. Deploy to Vercel + Supabase production (migrations applied, storage buckets + RLS checked).
+5. PWA install test checklist for a real iPhone (Safari → Share → Add to Home Screen) and Android (Chrome install prompt): manifest, all icon sizes, apple-touch-icon, splash, theme colour, standalone display, offline fallback page. Give the user the checklist to run on their phones.
+6. OG image (in Pathfinder's visual style) + title + description meta (and Twitter card) so the live link previews well in Discord/submission.
+7. Smoke test of the full demo path on the LIVE URL, not localhost: report → verify → route check → Start in Google Maps → Drive Watch (simulate) → Road Watch alert → Command Centre (demo login) → field update → traveller sees repairs. Give the user a step-by-step checklist and report anything that fails.
+8. README: setup, architecture diagram, which Meta models do what, the pitch line, what was built during the hackathon (dates), live link, demo login instructions.
+9. LICENSE file (MIT) + a "Built during the Meta Global AI Developer Hackathon, Oct 27 – Nov 4, 2026" note.
+
+**Done when (C):** live URL passes the smoke test, PWA installs on both phones, README/LICENSE complete, every screen visually consistent with the Glass design. → STOP. Wait for "continue" before Phase 7.
 
 ### Phase 7 — Ship (Wed Nov 4 evening)
 `docs/demo-script.md` (3-min story: problem → report → verify → route check → Road Watch alert → Command Centre loop → impact), help record the video, final submission checklist (public repo, video link, live link, no secrets, Meta models clearly listed). **Submit Wednesday night IST.**
