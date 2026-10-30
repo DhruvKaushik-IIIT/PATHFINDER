@@ -110,3 +110,33 @@ export function changeMessage(c: RouteChange, aheadKm: number, lang: Lang): stri
   if (c.kind === "status") return `Road Watch: changed. ${hazardMessage(e, aheadKm, "en")} It was ${status(c.was ?? "unknown", "en")}.`;
   return `Road Watch: new on your route. ${hazardMessage(e, aheadKm, "en")}`;
 }
+
+// ---------------------------------------------------------------- Slope Sentinel (Phase 6B)
+
+/** Warn once within this distance of an elevated/high slope site. */
+export const SLOPE_WARN_KM = 2;
+
+export interface DriveSlope {
+  id: string;
+  placeName: string | null;
+  level: string;
+  alongKm: number;
+}
+
+/** Slope sites that just came within 2 km ahead (each once). */
+export function dueSlopes(slopes: DriveSlope[], userKm: number, announced: Set<string>): { slope: DriveSlope; aheadKm: number }[] {
+  const out: { slope: DriveSlope; aheadKm: number }[] = [];
+  for (const s of slopes) {
+    const ahead = s.alongKm - userKm;
+    if (ahead < -PASSED_KM || ahead > SLOPE_WARN_KM || announced.has(`slope:${s.id}`)) continue;
+    announced.add(`slope:${s.id}`);
+    out.push({ slope: s, aheadKm: Math.max(0, ahead) });
+  }
+  return out;
+}
+
+/** "Unstable slope ahead near Aut. Don't stop for the next 2 kilometres." / Hindi */
+export function slopeMessage(s: DriveSlope, lang: Lang): string {
+  if (lang === "hi") return `आगे${s.placeName ? ` ${s.placeName} के पास` : ""} ढलान अस्थिर है। अगले ${SLOPE_WARN_KM} किलोमीटर तक न रुकें।`;
+  return `Unstable slope ahead${s.placeName ? ` near ${s.placeName}` : ""}. Don't stop for the next ${SLOPE_WARN_KM} kilometres.`;
+}

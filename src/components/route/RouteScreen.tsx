@@ -3,7 +3,7 @@
 // Frame 03 Route result (docs/design/glass-html/Route.dc.html). Two steps so it feels instant:
 // 1. GET /api/route → map, route line, code verdict (no AI, ~1 s)
 // 2. POST /api/route-check → the Route Check agent's verdict replaces it (5–30 s; cached 20 min)
-import { ChevronLeft, ChevronRight, CloudRain, Sparkles, Sun, Wrench } from "lucide-react";
+import { ChevronLeft, ChevronRight, CloudRain, Mountain, Sparkles, Sun, Wrench } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -16,6 +16,11 @@ import { clock, duration, VERDICT_STYLE } from "@/lib/geo/format";
 import type { RoutePlan } from "@/lib/geo/routeTypes";
 import type { WatchedTrip } from "@/lib/watch/types";
 import RiskLayer from "@/components/map/RiskLayer";
+import SlopeLayer from "@/components/map/SlopeLayer";
+import { fetchSlopes } from "@/components/map/useSlopes";
+import SlopeRows from "@/components/slope/SlopeRows";
+import { cumulative, project, type Coord } from "@/lib/drive/line";
+import type { SlopePin } from "@/lib/slope/types";
 import { replayLabel, type RouteRisk } from "@/lib/risk/types";
 import { routeEventIds, type Repair } from "@/lib/repairs/types";
 import StartActions from "./StartActions";
@@ -96,6 +101,20 @@ export default function RouteScreen() {
       alive = false;
     };
   }, [from, to, fromName, toName, depart, query, replay]);
+
+  // Slope sites with warning signs along the routes (Phase 6B, no AI): advice, never a closure.
+  const [slopes, setSlopes] = useState<SlopePin[]>([]);
+  useEffect(() => {
+    const coords = plan?.routes.flatMap((r) => r.geometry.coordinates);
+    if (!coords?.length) return setSlopes([]);
+    let alive = true;
+    const xs = coords.map((c) => c[0]!);
+    const ys = coords.map((c) => c[1]!);
+    fetchSlopes(Math.min(...xs) - 0.01, Math.min(...ys) - 0.01, Math.max(...xs) + 0.01, Math.max(...ys) + 0.01).then((p) => alive && setSlopes(p));
+    return () => {
+      alive = false;
+    };
+  }, [plan]);
 
   // Crews at work on this route's events (no AI) → "N repair crews working" link to frame 07.
   const eventKey = plan ? routeEventIds(plan).join(",") : "";
@@ -191,6 +210,9 @@ export default function RouteScreen() {
   }
 
   const best = plan?.routes[0];
+  const bestCoords = (best?.geometry.coordinates as Coord[] | undefined) ?? null;
+  const onRoute = slopesOnRoute(slopes, bestCoords);
+  const unstable = onRoute.filter((p) => p.level === "elevated" || p.level === "high");
   const issues = best?.events.filter((e) => e.delayMin > 0 || e.blocks) ?? [];
   const v = check?.verdict;
   const verdictKey = v?.verdict ?? best?.verdict.verdict ?? "go";
@@ -212,6 +234,7 @@ export default function RouteScreen() {
         showRoadLayer={false}
       >
         <RiskLayer id="pf-route-risk" areas={risk?.stretches ?? []} />
+        <SlopeLayer pins={onRoute} route={bestCoords} onSelect={(p) => router.push(`/slope/${p.id}${replay ? "?replay=1" : ""}`)} />
       </MapView>
 
       {/* top: back + trip pill */}
@@ -331,6 +354,25 @@ export default function RouteScreen() {
                 <ChevronRight size={15} strokeWidth={2.6} className="text-unknown" aria-hidden />
               </Link>
             )}
+            {/* Slope Sentinel (Phase 6B): elevated/high slope above the route → purple banner. Advice only. */}
+            {unstable.map((p) => (
+              <Link
+                key={p.id}
+                href={`/slope/${p.id}${replay ? "?replay=1" : ""}`}
+                className="flex items-start gap-[10px] rounded-[16px] bg-risk-bg px-[14px] py-3 text-risk-ink no-underline"
+              >
+                <Mountain size={20} strokeWidth={2.2} className="mt-px shrink-0" aria-hidden />
+                <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                  <span className="text-[15px] font-semibold leading-snug">{slopeBanner(p)}</span>
+                  {p.advice && <span className="text-[13px] leading-snug">{p.advice}</span>}
+                  <span className="text-[12px] opacity-90">Slope Sentinel · km {Math.round(p.km)} · warning signs, not a closure · verify with police / PWD</span>
+                </span>
+                <ChevronRight size={15} strokeWidth={2.6} className="mt-1 shrink-0 opacity-70" aria-hidden />
+              </Link>
+            ))}
+            {onRoute.some((p) => p.level === "watch") && (
+              <SlopeRows pins={onRoute.filter((p) => p.level === "watch")} replay={replay} sub={(p) => `km ${Math.round(p.km ?? 0)} · minor signs above the road`} />
+            )}
             {/* Rain risk (Risk Forecast v1): purple banner for moderate/high, a calm weather line otherwise */}
             {risk?.headline ? (
               <div role="note" className="flex items-start gap-[10px] rounded-[16px] bg-risk-bg px-[14px] py-3 text-risk-ink">
@@ -423,4 +465,24 @@ export default function RouteScreen() {
       </Sheet>
     </main>
   );
+}
+
+/** Slope sites within 300 m of the chosen route, in route order, with their km. */
+function slopesOnRoute(pins: SlopePin[], coords: Coord[] | null): (SlopePin & { km: number })[] {
+  if (!coords || coords.length < 2) return [];
+  const cum = cumulative(coords);
+  return pins
+    .map((p) => ({ p, at: project(coords, cum, [p.lng, p.lat]) }))
+    .filter((x) => x.at.offKm <= 0.3)
+    .sort((a, b) => a.at.alongKm - b.at.alongKm)
+    .map((x) => ({ ...x.p, km: x.at.alongKm }));
+}
+
+/** "Unstable slope above Aut + ~30 mm rain around 11 PM" */
+function slopeBanner(p: SlopePin): string {
+  const where = `Unstable slope above ${p.place ?? p.road ?? "the road"}`;
+  const r = p.rain;
+  if (!r || (r.level !== "moderate" && r.level !== "high")) return where;
+  const when = r.wettestAt ? ` around ${clock(r.wettestAt)}` : " in the next 24 h";
+  return `${where} + ~${Math.round(r.mm)} mm rain${when}`;
 }

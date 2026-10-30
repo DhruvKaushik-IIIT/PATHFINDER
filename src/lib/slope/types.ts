@@ -102,4 +102,15 @@ export interface SlopePin {
   level: SlopeLevel;
   headline: string | null;
   lastObservedAt: string | null;
+  advice?: string | null;
+  adviceHi?: string | null;
+  rain?: { mm: number; level: string; wettestAt: string | null; source: "forecast" | "replay" } | null;
 }
+
+/** Risk-purple tokens only (CLAUDE.md 6B design rule): intensity grows with the level, the word is always shown. */
+export const SLOPE_STYLE: Record<SlopeLevel, { bg: string; ink: string; dot: string }> = {
+  none: { bg: "rgba(142,142,147,0.16)", ink: "#48484A", dot: "#8E8E93" },
+  watch: { bg: "rgba(123,92,214,0.12)", ink: "#4A2F9A", dot: "#7B5CD6" },
+  elevated: { bg: "rgba(123,92,214,0.22)", ink: "#4A2F9A", dot: "#7B5CD6" },
+  high: { bg: "#7B5CD6", ink: "#FFFFFF", dot: "#4A2F9A" },
+};

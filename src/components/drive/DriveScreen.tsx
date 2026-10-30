@@ -14,7 +14,10 @@ import GlassButton from "@/components/glass/GlassButton";
 import Sheet from "@/components/glass/Sheet";
 import Toast from "@/components/glass/Toast";
 import { googleMapsUrl, pickWaypoints } from "@/lib/drive/handoff";
-import { changeMessage, diffEvents, dueAnnouncements, hazardMessage, type DriveEvent, type Lang } from "@/lib/drive/hazards";
+import { changeMessage, diffEvents, dueAnnouncements, dueSlopes, hazardMessage, slopeMessage, type DriveEvent, type DriveSlope, type Lang } from "@/lib/drive/hazards";
+import SlopeLayer from "@/components/map/SlopeLayer";
+import { fetchSlopes } from "@/components/map/useSlopes";
+import type { SlopePin } from "@/lib/slope/types";
 import { cumulative, pointAt, project, type Coord } from "@/lib/drive/line";
 import { STATUS_STYLE, type EventStatus, type MapEvent } from "@/lib/events/types";
 import { clock } from "@/lib/geo/format";
@@ -47,6 +50,8 @@ interface Banner {
   /** Shown under the main text: Hindi when the phone has no Hindi voice, or English under Hindi. */
   sub?: string;
   roadWatch: boolean;
+  /** Slope Sentinel warning (risk purple) instead of a road event. */
+  slope?: boolean;
 }
 
 const isHazard = (e: { status: string; type: string }) => e.status !== "open" && e.type !== "clear";
@@ -136,6 +141,29 @@ export default function DriveScreen() {
     setHazards(list);
   }, [route, line, toHazard]);
 
+  // Elevated/high slope sites on the chosen route (Phase 6B): warned once within 2 km. Advice, not a closure.
+  const [slopePins, setSlopePins] = useState<(SlopePin & { alongKm: number })[]>([]);
+  const slopes = useRef<DriveSlope[]>([]);
+  useEffect(() => {
+    if (line.length < 2) return;
+    let alive = true;
+    const xs = line.map((c) => c[0]);
+    const ys = line.map((c) => c[1]);
+    fetchSlopes(Math.min(...xs) - 0.01, Math.min(...ys) - 0.01, Math.max(...xs) + 0.01, Math.max(...ys) + 0.01).then((pins) => {
+      if (!alive) return;
+      const on = pins
+        .filter((p) => p.level === "elevated" || p.level === "high")
+        .map((p) => ({ p, at: project(line, cum, [p.lng, p.lat]) }))
+        .filter((x) => x.at.offKm <= 0.3)
+        .map((x) => ({ ...x.p, alongKm: x.at.alongKm }));
+      setSlopePins(on);
+      slopes.current = on.map((p) => ({ id: p.id, placeName: p.place, level: p.level, alongKm: p.alongKm }));
+    });
+    return () => {
+      alive = false;
+    };
+  }, [line, cum]);
+
   const show = useCallback((b: Omit<Banner, "key">, spoken: string) => {
     setBanner({ ...b, key: Date.now() });
     const { lang: l, muted: m } = prefs.current;
@@ -175,15 +203,22 @@ export default function DriveScreen() {
       if (p.offKm > OFF_ROUTE_KM) return; // off the planned road: distances would be wrong
       const due = dueAnnouncements([...known.current.values()], p.alongKm, announced.current);
       for (const d of due.slice(0, 2)) announce(d.event, d.aheadKm, (l) => hazardMessage(d.event, d.aheadKm, l), false);
+      if (due.length) return; // a road hazard right now wins; the slope warning comes on the next fix
+      for (const d of dueSlopes(slopes.current, p.alongKm, announced.current).slice(0, 1)) {
+        const l = prefs.current.lang;
+        const main = slopeMessage(d.slope, l);
+        const en = slopeMessage(d.slope, "en");
+        show({ status: "slope", title: "Slope Sentinel", text: main, sub: l === "hi" ? en : undefined, roadWatch: false, slope: true }, `${main}\u0000${en}`);
+      }
     },
-    [line, cum, announce],
+    [line, cum, announce, show],
   );
 
   // GPS (or the simulated track) while driving.
   useEffect(() => {
     if (!started || line.length < 2) return;
     if (simulate) {
-      const first = Math.min(...[...known.current.values()].map((h) => h.alongKm), totalKm);
+      const first = Math.min(...[...known.current.values(), ...slopes.current].map((h) => h.alongKm), totalKm);
       let km = Math.max(0, first - SIM_LEAD_KM);
       const tick = () => {
         const [lng, lat] = pointAt(line, cum, km);
@@ -319,7 +354,9 @@ export default function DriveScreen() {
         routes={route ? [route.geometry] : []}
         showRoadLayer={false}
         myLocation={me ? { latitude: me.lat, longitude: me.lng } : null}
-      />
+      >
+        <SlopeLayer pins={slopePins} route={line} onSelect={(p) => router.push(`/slope/${p.id}`)} />
+      </MapView>
       {/* NoSleep-style fallback when the Wake Lock API is missing (muted, hidden, looping). */}
       <video ref={videoRef} src="/drive/keep-awake.mp4" muted loop playsInline aria-hidden className="pointer-events-none absolute size-px opacity-0" />
 
@@ -346,7 +383,7 @@ export default function DriveScreen() {
             role="alert"
             onClick={() => setBanner(null)}
             className="glass flex w-full items-start gap-3 rounded-[18px] px-4 py-[14px] text-left"
-            style={{ borderLeft: `6px solid ${(STATUS_STYLE[banner.status as EventStatus] ?? STATUS_STYLE.unknown).dot}`, boxShadow: "0 8px 30px rgba(0,0,0,0.22)" }}
+            style={{ borderLeft: `6px solid ${banner.slope ? "#7B5CD6" : (STATUS_STYLE[banner.status as EventStatus] ?? STATUS_STYLE.unknown).dot}`, boxShadow: "0 8px 30px rgba(0,0,0,0.22)" }}
           >
             <span className="flex min-w-0 flex-1 flex-col gap-1">
               <span className="flex items-center gap-2">
@@ -496,6 +533,10 @@ function blankEvent(h: Hazard): MapEvent {
 }
 
 function StatusPill({ status }: { status: string }) {
+  if (status === "slope")
+    return (
+      <span className="rounded-full bg-risk-bg px-[9px] py-[3px] text-[12px] font-bold text-risk-ink">Slope risk</span>
+    );
   const st = STATUS_STYLE[status as EventStatus] ?? STATUS_STYLE.unknown;
   return (
     <span className="rounded-full px-[9px] py-[3px] text-[12px] font-bold" style={{ background: st.bg, color: st.ink }}>

@@ -56,7 +56,7 @@ export async function slideHistory(site: Pick<SlopeSite, "lat" | "lng" | "segmen
 }
 
 /** Runs one tool call. Never throws: errors come back as text the model can recover from. */
-export async function runSlopeTool(ctx: SlopeToolContext, name: string, _args: string): Promise<unknown> {
+export async function runSlopeTool(ctx: SlopeToolContext, name: string): Promise<unknown> {
   const site = ctx.site;
   try {
     switch (name) {

@@ -917,7 +917,7 @@ export function assessSlopeRisk(ctx: SlopeToolContext, trigger: string): Promise
         system: SLOPE_RISK_SYSTEM,
         user,
         tools: SLOPE_TOOLS,
-        exec: (name, args) => runSlopeTool(ctx, name, args),
+        exec: (name) => runSlopeTool(ctx, name),
         submit: { name: "submit_risk", schema: SlopeRisk },
         maxTurns: 6,
         effort: "low",

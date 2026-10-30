@@ -57,6 +57,9 @@ export function toPin(s: SlopeSite): SlopePin {
     level: s.risk_level,
     headline: s.risk?.reasons?.[0] ?? null,
     lastObservedAt: s.last_observed_at,
+    advice: s.risk?.advice ?? null,
+    adviceHi: s.risk?.adviceHi ?? null,
+    rain: s.risk?.rain ? { mm: s.risk.rain.mm, level: s.risk.rain.level, wettestAt: s.risk.rain.wettestAt, source: s.risk.rain.source } : null,
   };
 }
 
