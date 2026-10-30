@@ -18,6 +18,7 @@ import type { WatchedTrip } from "@/lib/watch/types";
 import RiskLayer from "@/components/map/RiskLayer";
 import { replayLabel, type RouteRisk } from "@/lib/risk/types";
 import { routeEventIds, type Repair } from "@/lib/repairs/types";
+import StartActions from "./StartActions";
 import { checkedBy, departLabel, eventTitle, saveCheck, VERDICT_WORD, type CheckResult } from "./routeData";
 
 const MapView = dynamic(() => import("@/components/map/MapView"), {
@@ -272,6 +273,9 @@ export default function RouteScreen() {
                 {best.viaRoads[0] ? ` · via ${best.viaRoads[0]}` : ""}
               </span>
             </div>
+
+            {/* Phase 6A: hand-off to Google Maps + Drive Watch, shown for every route */}
+            <StartActions plan={plan!} query={query} />
 
             {/* outside-HP legs (7.5c) */}
             {outside.map((l, i) => (
