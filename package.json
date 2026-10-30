@@ -17,6 +17,8 @@
     "test:vision": "node --env-file-if-exists=.env.local scripts/test-vision.ts",
     "test:sam": "node --env-file-if-exists=.env.local scripts/test-sam.ts",
     "test:slope-sam": "node --env-file-if-exists=.env.local scripts/test-slope-sam.ts",
+    "test:slope": "node scripts/test-slope.ts",
+    "test:slope-live": "node --env-file-if-exists=.env.local scripts/test-slope-live.ts",
     "test:voice": "node --env-file-if-exists=.env.local scripts/test-voice.ts",
     "test:pipeline": "node --env-file-if-exists=.env.local scripts/test-pipeline.ts",
     "test:claim": "node --env-file-if-exists=.env.local scripts/test-claim.ts",

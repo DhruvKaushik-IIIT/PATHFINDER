@@ -16,6 +16,10 @@ import { NEWS_PARSE_SYSTEM, newsParseUserText, newsSearchPrompt } from "./prompt
 import { ADVISORY_SYSTEM, advisoryUserText } from "./prompts/advisory.ts";
 import { DISPATCH_SYSTEM, dispatchUserText } from "./prompts/dispatch.ts";
 import { INVESTIGATE_SYSTEM, investigateUserText } from "./prompts/investigate.ts";
+import { SLOPE_CHECK_SYSTEM, SLOPE_SYSTEM, slopeCheckUserText, slopeUserText } from "./prompts/slope.ts";
+import { SLOPE_RISK_SYSTEM, slopeRiskUserText } from "./prompts/slopeRisk.ts";
+import { runSlopeTool, SLOPE_TOOLS, type SlopeToolContext } from "./tools/slope.ts";
+import { SlopeCheck, SlopeReading, SlopeRisk } from "./schemas.ts";
 import { Advisory, ClaimSet, DispatchProposal, Investigation, jsonSchemaFormat, NearbySummary, NewsItems, parseJson, RouteVerdict, Verdict, type Claim } from "./schemas.ts";
 import { DISPATCH_TOOLS, runDispatchTool, type DispatchContext } from "./tools/dispatch.ts";
 import { INVESTIGATE_TOOLS, runInvestigateTool, type InvestigateContext } from "./tools/investigate.ts";
@@ -832,6 +836,100 @@ export function investigate(ctx: InvestigateContext, reason: string): Promise<Jo
     attempts: [attempt("baseten", MODELS.sparkOpen), attempt("meta", MODELS.spark)],
     mock: () => ({ findings: null, by: "mock", trace: [] }),
     lastResort: () => ({ findings: null, by: "code", trace: [] }),
+  });
+}
+
+// ---------------------------------------------------------------- Slope Sentinel (Phase 6B)
+
+export interface SlopeReadOutput {
+  reading: SlopeReading;
+  by: Provider | "mock";
+}
+
+/** Hillside photo (+ SAM boxes) → SlopeReading. Baseten Spark Open → Meta Spark → null (= pending review). */
+export function readSlope(input: Parameters<typeof slopeUserText>[0] & { jpeg: Buffer }): Promise<JobResult<SlopeReadOutput | null>> {
+  const content: ChatContent = [{ type: "text", text: slopeUserText(input) }, imagePart(input.jpeg)];
+  const attempt = (provider: Provider, model: string): Attempt<SlopeReadOutput | null> => ({
+    provider,
+    model,
+    run: async (c) => {
+      const { data, usage } = await chatJson(c, provider, model, { name: "slope_reading", schema: SlopeReading, system: SLOPE_SYSTEM, content });
+      return { data: { reading: data, by: provider }, usage };
+    },
+  });
+  return runJob<SlopeReadOutput | null>({
+    purpose: "read_slope",
+    attempts: [attempt("baseten", MODELS.sparkOpen), attempt("meta", MODELS.spark)],
+    mock: () => ({ reading: fixture("slope-reading", SlopeReading), by: "mock" }),
+    lastResort: () => null,
+  });
+}
+
+export interface SlopeCheckOutput {
+  check: SlopeCheck;
+  by: Provider | "mock" | "rules";
+}
+
+/** Independent second look. Meta Spark → Baseten → rule-based (never raises, never confirms a weak reading). */
+export function checkSlope(jpeg: Buffer, reading: SlopeReading, context: string): Promise<JobResult<SlopeCheckOutput>> {
+  const content: ChatContent = [{ type: "text", text: slopeCheckUserText(reading, context) }, imagePart(jpeg)];
+  const attempt = (provider: Provider, model: string): Attempt<SlopeCheckOutput> => ({
+    provider,
+    model,
+    run: async (c) => {
+      const { data, usage } = await chatJson(c, provider, model, { name: "slope_check", schema: SlopeCheck, system: SLOPE_CHECK_SYSTEM, content });
+      return { data: { check: data, by: provider }, usage };
+    },
+  });
+  return runJob<SlopeCheckOutput>({
+    purpose: "check_slope",
+    attempts: [attempt("meta", MODELS.spark), attempt("baseten", MODELS.sparkOpen)],
+    mock: () => ({ check: { verdict: "agree", correctedOverall: null, disputedSigns: [], confidence: 0.8, reasoning: "mock" }, by: "mock" }),
+    // No AI: a non-slope photo is rejected; severe readings are held at "concerning" until a model checks them.
+    lastResort: () => ({
+      by: "rules",
+      check: {
+        verdict: !reading.isSlopePhoto ? "reject" : reading.overall === "severe" ? "downgrade" : "agree",
+        correctedOverall: reading.overall === "severe" ? "concerning" : null,
+        disputedSigns: [],
+        confidence: Math.min(reading.confidence, 0.5),
+        reasoning: "Second AI check unavailable — rule-based check only.",
+      },
+    }),
+  });
+}
+
+export interface SlopeRiskOutput {
+  risk: SlopeRisk | null;
+  by: Provider | "mock" | "code";
+  trace: string[];
+}
+
+/** Slope risk agent: Meta Muse Wonder (low) → Baseten Spark Open → null (the caller uses the code matrix). */
+export function assessSlopeRisk(ctx: SlopeToolContext, trigger: string): Promise<JobResult<SlopeRiskOutput>> {
+  const user = slopeRiskUserText({ siteId: ctx.site.id, place: ctx.site.place_name, now: ist(new Date()), trigger });
+  const attempt = (provider: Provider, model: string): Attempt<SlopeRiskOutput> => ({
+    provider,
+    model,
+    kind: "agent",
+    run: async (c) => {
+      const { data, usage } = await agentLoop(c, provider, model, {
+        system: SLOPE_RISK_SYSTEM,
+        user,
+        tools: SLOPE_TOOLS,
+        exec: (name, args) => runSlopeTool(ctx, name, args),
+        submit: { name: "submit_risk", schema: SlopeRisk },
+        maxTurns: 6,
+        effort: "low",
+      });
+      return { data: { risk: data.data, by: provider, trace: data.trace }, usage };
+    },
+  });
+  return runJob<SlopeRiskOutput>({
+    purpose: "slope_risk",
+    attempts: [attempt("meta", MODELS.wonder), attempt("baseten", MODELS.sparkOpen)],
+    mock: () => ({ risk: null, by: "mock", trace: [] }),
+    lastResort: () => ({ risk: null, by: "code", trace: [] }),
   });
 }
 
