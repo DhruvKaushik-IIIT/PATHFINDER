@@ -22,6 +22,7 @@
     "test:fit-live": "node --env-file-if-exists=.env.local scripts/test-fit-live.ts",
     "test:slope-live": "node --env-file-if-exists=.env.local scripts/test-slope-live.ts",
     "seed-slopes": "node --env-file-if-exists=.env.local scripts/seed-slopes.ts",
+    "seed-real-photos": "node --env-file-if-exists=.env.local scripts/seed-real-photos.ts",
     "test:voice": "node --env-file-if-exists=.env.local scripts/test-voice.ts",
     "test:pipeline": "node --env-file-if-exists=.env.local scripts/test-pipeline.ts",
     "test:claim": "node --env-file-if-exists=.env.local scripts/test-claim.ts",
