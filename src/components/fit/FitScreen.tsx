@@ -1,5 +1,6 @@
 "use client";
 
+import { liveFetch } from "@/lib/live";
 // "Can my vehicle cross?" (Phase 6C), frame-05 layout: tall glass sheet over the map centred on the event.
 // Step 1 your vehicle (photo / list / saved) → step 2 checking (step list, like /report) → step 3 the report:
 // verdict pill + headline, width diagram, factors, advice EN/HI, evidence, "Checked by …", save my vehicle.
@@ -57,7 +58,7 @@ export default function FitScreen({ id }: { id: string }) {
   const [savedNow, setSavedNow] = useState(false);
 
   useEffect(() => {
-    fetch(`/api/events/${id}`)
+    liveFetch(`/api/events/${id}`)
       .then((r) => r.json() as Promise<{ data?: EventDetail | null }>)
       .then((b) => b.data && setEv(b.data))
       .catch(() => {});

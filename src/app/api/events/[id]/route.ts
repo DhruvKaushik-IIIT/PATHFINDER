@@ -1,4 +1,5 @@
 // GET /api/events/[id] → one event with measurements, passability, clearing window, photos and timeline.
+import { liveCache } from "@/lib/events/version.ts";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { hasDb, select } from "@/lib/db/supabase.ts";
@@ -99,7 +100,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       timeline: r.event_timeline,
     };
     // Short edge cache: repeat opens are instant; a crew/official update shows up within ~10–40 s.
-    return NextResponse.json({ ok: true, data }, { headers: { "Cache-Control": "public, s-maxage=10, stale-while-revalidate=30" } });
+    return NextResponse.json({ ok: true, data }, { headers: liveCache(_req) });
   } catch (err) {
     console.error("[event] query failed:", (err as Error).message);
     return NextResponse.json({ ok: true, data: null, degraded: "event details unavailable right now" });

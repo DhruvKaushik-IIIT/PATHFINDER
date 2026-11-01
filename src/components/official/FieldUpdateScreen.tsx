@@ -1,5 +1,6 @@
 "use client";
 
+import { bumpVersion, liveFetch } from "@/lib/live";
 // Frame 15 Field update (FieldUpdate.dc.html): tall sheet over the map. Progress photo (required) →
 // SAM measures it right away; the AI check line re-evaluates live as the official moves the slider or
 // changes the status (pure code, progress.ts). Status segmented, % cleared, fully-open time, machines,
@@ -63,8 +64,8 @@ export default function FieldUpdateScreen({ eventId, back = "/official", final =
     (async () => {
       try {
         const [e, r] = await Promise.all([
-          fetch(`/api/events/${eventId}`).then((x) => x.json() as Promise<{ data?: EventDetail | null; error?: string }>),
-          fetch(`/api/repairs?ids=${eventId}`).then((x) => x.json() as Promise<{ data?: Repair[] }>).catch(() => ({ data: [] })),
+          liveFetch(`/api/events/${eventId}`).then((x) => x.json() as Promise<{ data?: EventDetail | null; error?: string }>),
+          liveFetch(`/api/repairs?ids=${eventId}`).then((x) => x.json() as Promise<{ data?: Repair[] }>).catch(() => ({ data: [] })),
         ]);
         if (!alive) return;
         if (!e.data) return setFailed(e.error ?? "Event not found");
@@ -162,6 +163,7 @@ export default function FieldUpdateScreen({ eventId, back = "/official", final =
       if (res.status === 401) return router.replace("/official/login");
       const j = (await res.json()) as { ok: boolean; data?: { resolved: boolean; check: { level: string } }; error?: string };
       if (!j.ok || !j.data) throw new Error(j.error);
+      bumpVersion(); // this device's next reads must see the change
       router.push(`${back}?updated=${j.data.resolved ? "open" : j.data.check.level}`);
     } catch (err) {
       setToast((err as Error).message || "Couldn't post the update — try again");

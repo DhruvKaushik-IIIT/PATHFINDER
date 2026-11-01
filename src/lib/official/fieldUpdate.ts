@@ -6,6 +6,7 @@ import { transcribe } from "../ai/router.ts";
 import { debrisVolumeM3 } from "../clearing/estimate.ts";
 import { insert, publicUrl, select, update, upload } from "../db/supabase.ts";
 import { releaseCrew } from "../crew/builder.ts";
+import { machinesLabel } from "../repairs/types.ts";
 import { eventTitle, type EventStatus } from "../events/types.ts";
 import { clock } from "../geo/format.ts";
 import { preparePhoto, processPhoto, type PreparedPhoto, type ProcessedPhoto } from "../reports/processPhoto.ts";
@@ -143,7 +144,7 @@ export async function postFieldUpdate(official: Official, input: FieldInput): Pr
   const newStatus = FIELD_STATUS[input.status].event;
   const resolved = input.status === "open";
   const crew = crewRows[0] ?? null;
-  const machines = input.machines.split(",").map((s) => s.trim()).filter(Boolean).slice(0, 8);
+  const machines = input.machines.split(/[,+]/).map((s) => s.trim()).filter(Boolean).slice(0, 8);
 
   // ---- photo (private original, blurred public copy) — same buckets as traveller reports
   const [photoRow] = await insert<{ id: string }>("photos", {
@@ -217,7 +218,7 @@ export async function postFieldUpdate(official: Official, input: FieldInput): Pr
   const parts = [
     resolved ? "Fully open" : `${input.pctCleared}% cleared · ${FIELD_STATUS[input.status].label.toLowerCase()}`,
     etaText,
-    machines.length ? machines.join(", ") : null,
+    machines.length ? machinesLabel(machines) : null,
   ].filter(Boolean);
   const flag = check.level === "warn" ? " · ⚠ photo doesn't match — flagged" : check.level === "unknown" ? " · photo not checked" : " · photo matches";
   await insert("event_timeline", {

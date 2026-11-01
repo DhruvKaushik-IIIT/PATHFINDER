@@ -1,5 +1,6 @@
 "use client";
 
+import { liveFetch } from "@/lib/live";
 // Loads open events for the visible map area (GET /api/events?bbox=), refetching after pans.
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { MapRef } from "react-map-gl/maplibre";
@@ -23,7 +24,7 @@ export function useEvents(mapRef: React.RefObject<MapRef | null>) {
     if (key === lastKey.current) return;
     lastKey.current = key;
     try {
-      const res = await fetch(`/api/events?bbox=${key}`);
+      const res = await liveFetch(`/api/events?bbox=${key}`);
       const body = (await res.json()) as { ok: boolean; data?: MapEvent[] };
       // Later markers draw on top: put the most severe last so an overlap hides the milder pin.
       if (body.ok && body.data) setEvents([...body.data].sort((a, b) => SEVERITY[a.status] - SEVERITY[b.status]));

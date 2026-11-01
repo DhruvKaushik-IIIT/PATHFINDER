@@ -1,5 +1,6 @@
 "use client";
 
+import { liveFetch } from "@/lib/live";
 // Frame 07 Repairs on your route (RouteWork.dc.html): same query as /route; the plan comes from the
 // server's 3-min plan cache (no AI), then the crews/official updates for the events on it.
 import { X } from "lucide-react";
@@ -37,7 +38,7 @@ export default function RepairsScreen() {
     (async () => {
       try {
         const qs = new URLSearchParams({ from, to, fromName: p.get("fromName") ?? "", toName: p.get("toName") ?? "", ...(p.get("depart") && { depart: p.get("depart")! }) });
-        const body = (await (await fetch(`/api/route?${qs}`)).json()) as { data: RoutePlan | null; degraded?: string };
+        const body = (await (await liveFetch(`/api/route?${qs}`)).json()) as { data: RoutePlan | null; degraded?: string };
         if (!alive) return;
         if (!body.data) {
           setRepairs([]);
@@ -46,7 +47,7 @@ export default function RepairsScreen() {
         }
         setPlan(body.data);
         const ids = routeEventIds(body.data);
-        const r = ids.length ? ((await (await fetch(`/api/repairs?ids=${ids.join(",")}`)).json()) as { data: Repair[]; degraded?: string }) : { data: [] };
+        const r = ids.length ? ((await (await liveFetch(`/api/repairs?ids=${ids.join(",")}`)).json()) as { data: Repair[]; degraded?: string }) : { data: [] };
         if (!alive) return;
         setRepairs(r.data);
         if ("degraded" in r && r.degraded) setToast(r.degraded);

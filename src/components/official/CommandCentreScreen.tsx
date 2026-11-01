@@ -105,6 +105,15 @@ export default function CommandCentreScreen() {
   }, [router, version]);
 
 
+  // Live: re-read the queue + crews every 30 s while the screen is open and visible, so a crew's
+  // field update / arrival shows up without a reload (Nov 1 sync fix).
+  useEffect(() => {
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible") setVersion((v) => v + 1);
+    }, 30_000);
+    return () => clearInterval(t);
+  }, []);
+
   async function signOut() {
     await fetch("/api/official/logout", { method: "POST" }).catch(() => {});
     router.replace("/official/login");

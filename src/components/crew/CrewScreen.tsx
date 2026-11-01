@@ -273,7 +273,7 @@ export default function CrewScreen() {
                   {crew.arrivedAt && (
                     <Link href={`/official/field/${job.eventId}?from=crew&final=1`} className="flex h-[50px] items-center justify-center gap-2 rounded-[14px] bg-open-bg text-[16px] font-semibold text-open-ink no-underline">
                       <Check size={18} strokeWidth={2.4} aria-hidden />
-                      Job done — road fully open
+                      Road fully open? Post final update
                     </Link>
                   )}
                   <span className="text-center text-[12px] text-ink-2">Updates need a photo · the AI checks it matches what you report.</span>

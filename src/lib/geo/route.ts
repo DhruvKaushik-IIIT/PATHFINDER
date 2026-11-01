@@ -7,6 +7,7 @@ import { openEventsInBbox } from "../events/queries.ts";
 import type { MapEvent } from "../events/types.ts";
 import { HP_BOUNDARY } from "./hpBoundary.ts";
 import { osrmRoutes, type OsrmRoute } from "./osrm.ts";
+import { dataVersion } from "../events/version.ts";
 import type { CodeVerdict, RouteEvent, RouteLeg, RouteOption, RoutePlan } from "./routeTypes.ts";
 import { nearestPlace } from "./snap.ts";
 
@@ -233,7 +234,9 @@ export async function planRoute(
   departAt: Date,
   opts: { fresh?: boolean } = {},
 ): Promise<RoutePlan & { degraded?: string }> {
-  const key = `${[from.lat, from.lng, to.lat, to.lng].map((x) => x.toFixed(4)).join(",")}|${from.name}|${to.name}|${Math.floor(departAt.getTime() / 300_000)}`;
+  // Keyed by the data version too, so a changed event (field update, report, crew) is seen at once.
+  const v = await dataVersion().catch(() => String(Date.now()));
+  const key = `${[from.lat, from.lng, to.lat, to.lng].map((x) => x.toFixed(4)).join(",")}|${from.name}|${to.name}|${Math.floor(departAt.getTime() / 300_000)}|${v}`;
   const hit = planCache.get(key);
   if (hit && !opts.fresh && Date.now() - hit.at < PLAN_TTL_MS) return hit.plan;
   const plan = await buildPlan(from, to, departAt);
