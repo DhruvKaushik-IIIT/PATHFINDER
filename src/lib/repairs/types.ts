@@ -19,6 +19,20 @@ export interface Repair {
   check: "ok" | "warn" | "unknown" | null;
   /** A crew is assigned, or an official update came in the last 12 h. */
   atWork: boolean;
+  /** Newest voice note from the site (≤12 h old), transcribed + translated at post time. */
+  note: SiteNoteView | null;
+}
+
+export interface SiteNoteView {
+  by: string;
+  role: string;
+  crew: string | null;
+  at: string;
+  /** As transcribed (often Hindi). */
+  text: string;
+  en: string | null;
+  hi: string | null;
+  lang: "hi" | "en" | "mixed" | "other" | null;
 }
 
 /** ["JCB","JCB","Tipper"] / ["2 JCB","1 tipper"] → "2 JCB + tipper" style text. */

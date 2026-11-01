@@ -172,6 +172,14 @@ export const CrewBrief = z.object({
 });
 export type CrewBrief = z.infer<typeof CrewBrief>;
 
+/** A site worker's voice note, translated for the public "Note from the site" card (Nov 1). */
+export const SiteNote = z.object({
+  lang: z.enum(["hi", "en", "mixed", "other"]),
+  en: z.string().describe("the note in plain English, 1–3 short sentences"),
+  hi: z.string().describe("the note in clean Hindi (Devanagari)"),
+});
+export type SiteNote = z.infer<typeof SiteNote>;
+
 // ---------------------------------------------------------------- Investigator (Phase 5)
 
 /** What the Investigator submits. Code decides what changes (it never sets an event's status). */

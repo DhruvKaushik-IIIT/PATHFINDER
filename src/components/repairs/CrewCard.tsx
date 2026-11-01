@@ -1,5 +1,6 @@
 // Frame 07 crew card: org · crew, "At work" pill, % cleared bar, Now / Fully open / Machines, last update
 // + whether the AI photo check matched. Used on /route/repairs and the event page (frame 05).
+import { Mic } from "lucide-react";
 import Link from "next/link";
 import { STATUS_STYLE } from "@/lib/events/types";
 import { clock } from "@/lib/geo/format";
@@ -69,6 +70,15 @@ export default function CrewCard({ r, link = true }: { r: Repair; link?: boolean
           <span className="truncate text-[14px] font-semibold">{machinesLabel(r.machines)}</span>
         </span>
       </div>
+      {/* Repairs list: a one-line preview of the newest site note (the full card is on the event page). */}
+      {link && r.note && (
+        <span className="flex items-start gap-1.5 text-[13px] leading-snug text-ink-2">
+          <Mic size={14} strokeWidth={2.2} className="mt-[2px] shrink-0 text-accent" aria-hidden />
+          <span className="line-clamp-2">
+            <b className="font-semibold text-ink">{r.note.by}:</b> “{r.note.en ?? r.note.text}”
+          </span>
+        </span>
+      )}
       <span className="text-[12px] text-ink-2">
         {r.lastUpdateAt ? `Last update ${clock(r.lastUpdateAt)}${r.check ? ` · ${CHECK[r.check]}` : ""}` : "Crew assigned · no field update yet"}
       </span>

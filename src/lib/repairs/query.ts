@@ -3,7 +3,9 @@
 import { select } from "../db/supabase.ts";
 import { eventTitle, type EventStatus } from "../events/types.ts";
 import { roadLabel } from "../official/queue.ts";
-import type { Repair } from "./types.ts";
+import type { Repair, SiteNoteView } from "./types.ts";
+
+const NOTE_MS = 12 * 3_600_000;
 
 const RECENT_MS = 48 * 3_600_000;
 const AT_WORK_MS = 12 * 3_600_000;
@@ -28,7 +30,13 @@ interface UpdateRow {
   pct_cleared: number | null;
   eta_full_open: string | null;
   machines: string[] | null;
-  ai_check: { level?: Repair["check"]; crew?: string | null; org?: string } | null;
+  ai_check: {
+    level?: Repair["check"];
+    crew?: string | null;
+    org?: string;
+    transcript?: string | null;
+    note?: { text: string; en: string | null; hi: string | null; lang: SiteNoteView["lang"]; by: string; role: string } | null;
+  } | null;
   created_at: string;
 }
 
@@ -49,6 +57,21 @@ export async function repairsFor(ids: string[]): Promise<Repair[]> {
     const last = updates.find((u) => u.event_id === id) ?? null;
     if (!crew && !last) continue;
     const lastAt = last?.created_at ?? null;
+    // Newest update that carried a voice note (may be older than the newest update), ≤12 h.
+    const withNote = updates.find((u) => u.event_id === id && (u.ai_check?.note || u.ai_check?.transcript) && Date.now() - new Date(u.created_at).getTime() < NOTE_MS);
+    const n = withNote?.ai_check;
+    const note: SiteNoteView | null = withNote && n
+      ? {
+          by: n.note?.by ?? n.org ?? "Road crew",
+          role: n.note?.role ?? "official",
+          crew: n.crew ?? null,
+          at: withNote.created_at,
+          text: n.note?.text ?? n.transcript ?? "",
+          en: n.note?.en ?? null,
+          hi: n.note?.hi ?? null,
+          lang: n.note?.lang ?? null,
+        }
+      : null;
     out.push({
       eventId: id,
       title: eventTitle(e.type, e.place_name),
@@ -63,6 +86,7 @@ export async function repairsFor(ids: string[]): Promise<Repair[]> {
       lastUpdateAt: lastAt,
       check: last?.ai_check?.level ?? null,
       atWork: !e.resolved_at && (Boolean(crew) || (lastAt !== null && Date.now() - new Date(lastAt).getTime() < AT_WORK_MS)),
+      note,
     });
   }
   return out;

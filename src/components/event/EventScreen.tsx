@@ -12,6 +12,7 @@ import { approxRange, clearWindow } from "@/lib/events/format";
 import { ago, STATUS_STYLE, type EventDetail, type InvestigationSummary } from "@/lib/events/types";
 import { eventTitle } from "@/components/route/routeData";
 import CrewCard from "@/components/repairs/CrewCard";
+import SiteNote from "@/components/repairs/SiteNote";
 import ModelChecks from "@/components/verification/ModelChecks";
 import SheetMessage from "@/components/glass/SheetMessage";
 import type { Repair } from "@/lib/repairs/types";
@@ -200,6 +201,7 @@ export default function EventScreen({ id }: { id: string }) {
 
             {ev.reopening && ev.reopening.method !== "none" && <Predictor r={ev.reopening} />}
             {repair && <CrewCard r={repair} link={false} />}
+            {repair?.note && <SiteNote note={repair.note} />}
 
             <div className="glass-card flex items-start gap-[10px] px-[14px] py-3">
               {newsOnly ? (
