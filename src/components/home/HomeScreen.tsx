@@ -16,7 +16,7 @@ import { useEvents } from "@/components/map/useEvents";
 import SlopeLayer from "@/components/map/SlopeLayer";
 import { useSlopes } from "@/components/map/useSlopes";
 import { useLocationPing } from "@/components/me/useLocationPing";
-import { STATUS_STYLE, type MapEvent, type NearbyResult } from "@/lib/events/types";
+import { STATUS_STYLE, type MapEvent, type TopResult } from "@/lib/events/types";
 import type { Place } from "@/lib/geo/placeTypes";
 import { routeUrl, type WatchedTrip } from "@/lib/watch/types";
 
@@ -38,7 +38,7 @@ export default function HomeScreen() {
   const [searching, setSearching] = useState(false);
   const [picked, setPicked] = useState<Place | null>(null);
   const onSearchActive = useCallback((active: boolean) => setSearching(active), []);
-  const near = useNearby(me);
+  const top = useTop();
   // Scouts: coarse location every 5 min while the app is open, only if they chose "While using" on /me.
   const [locationOn, setLocationOn] = useState(false);
   useEffect(() => {
@@ -147,7 +147,8 @@ export default function HomeScreen() {
             <PlaceCard
               key={picked.id}
               place={picked}
-              origin={me ? { name: "Your location", lat: me.latitude, lng: me.longitude, isMe: true } : { name: "Mandi", lat: 31.708, lng: 76.932, isMe: false }}
+              me={me}
+              onLocated={setMe}
               onClose={() => setPicked(null)}
             />
           )}
@@ -161,10 +162,10 @@ export default function HomeScreen() {
           </div>
 
           <Row
-            href={me ? `/nearby?lat=${me.latitude.toFixed(4)}&lng=${me.longitude.toFixed(4)}` : "/nearby"}
-            lead={<span className="size-[10px] shrink-0 rounded-full" style={{ background: near.dot }} />}
-            title={me ? "Near you right now" : "Around Mandi right now"}
-            subtitle={near.text}
+            href="/himachal"
+            lead={<span className="size-[10px] shrink-0 rounded-full" style={{ background: top.dot }} />}
+            title="Across Himachal right now"
+            subtitle={top.text}
           />
           {watching ? (
             <Row
@@ -210,28 +211,30 @@ function useRoadWatch(): { unread: number; watching: WatchedTrip | null } {
   return { unread, watching };
 }
 
-/** Counts for the "Near you right now" row: /api/nearby without the AI summary (free). */
-function useNearby(me: LatLng | null): { text: string; dot: string } {
-  const [res, setRes] = useState<NearbyResult | null>(null);
-  const lat = me?.latitude.toFixed(2) ?? "31.71";
-  const lng = me?.longitude.toFixed(2) ?? "76.93";
+/** Counts for the "Across Himachal right now" row: /api/top (plain code, no AI). */
+function useTop(): { text: string; dot: string } {
+  const [res, setRes] = useState<TopResult | null | undefined>(undefined);
   useEffect(() => {
     let alive = true;
-    fetch(`/api/nearby?lat=${lat}&lng=${lng}&radiusKm=25&summary=0`)
-      .then((r) => r.json() as Promise<{ data: NearbyResult | null }>)
+    fetch("/api/top?limit=1")
+      .then((r) => r.json() as Promise<{ data: TopResult | null }>)
       .then((b) => alive && setRes(b.data))
-      .catch(() => {});
+      .catch(() => alive && setRes(null));
     return () => {
       alive = false;
     };
-  }, [lat, lng]);
-  if (!res) return { text: "Checking roads within 25 km…", dot: STATUS_STYLE.unknown.dot };
+  }, []);
+  if (res === undefined) return { text: "Checking roads across Himachal…", dot: STATUS_STYLE.unknown.dot };
+  if (!res) return { text: "Top incidents and closures across the state", dot: STATUS_STYLE.unknown.dot };
   const c = res.counts;
   const parts = [c.closed && `${c.closed} closed`, c.oneLane && `${c.oneLane} one lane`, c.slow && `${c.slow} slow`].filter(Boolean);
-  if (!parts.length) return { text: "No verified issues within 25 km", dot: STATUS_STYLE.open.dot };
-  const top = res.items[0];
-  const where = top?.placeName ? ` · ${STATUS_STYLE[top.status].word.toLowerCase()} near ${top.placeName}` : "";
-  return { text: `${parts.join(" · ")} within 25 km${where}`, dot: STATUS_STYLE[c.closed ? "closed" : "slow"].dot };
+  if (!parts.length && !res.total) return { text: "No verified issues anywhere in Himachal", dot: STATUS_STYLE.open.dot };
+  const t = res.items[0];
+  const lead = t ? ` · top: ${STATUS_STYLE[t.status].word.toLowerCase()} ${t.placeName ? `at ${t.placeName}` : (t.road ?? "")}` : "";
+  return {
+    text: `${parts.length ? parts.join(" · ") : `${res.total} reports`}${lead} · see top 10`,
+    dot: STATUS_STYLE[c.closed ? "closed" : c.oneLane || c.slow ? "slow" : "unknown"].dot,
+  };
 }
 
 function Tile({ href, label, icon, filled = false }: { href: string; label: string; icon: React.ReactNode; filled?: boolean }) {

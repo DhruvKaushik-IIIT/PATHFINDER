@@ -5,7 +5,19 @@ import { MapPin, Mic, Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { Place } from "@/lib/geo/placeTypes";
 
-export default function PlaceSearch({ onPick, onFocusChange }: { onPick: (p: Place) => void; onFocusChange?: (active: boolean) => void }) {
+export default function PlaceSearch({
+  onPick,
+  onFocusChange,
+  placeholder = "Where to?",
+  autoFocus = false,
+  showMic = true,
+}: {
+  onPick: (p: Place) => void;
+  onFocusChange?: (active: boolean) => void;
+  placeholder?: string;
+  autoFocus?: boolean;
+  showMic?: boolean;
+}) {
   const [q, setQ] = useState("");
   const [results, setResults] = useState<Place[]>([]);
   const [loading, setLoading] = useState(false);
@@ -41,12 +53,13 @@ export default function PlaceSearch({ onPick, onFocusChange }: { onPick: (p: Pla
     <div className="flex flex-col gap-2">
       <label className="flex h-12 items-center gap-[10px] rounded-[14px] bg-[rgba(118,118,128,0.14)] px-[14px]">
         <Search size={18} strokeWidth={2.2} className="shrink-0 text-[#3C3C43]" aria-hidden />
-        <span className="sr-only">Where to?</span>
+        <span className="sr-only">{placeholder}</span>
         <input
           type="search"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="Where to?"
+          placeholder={placeholder}
+          autoFocus={autoFocus}
           autoComplete="off"
           enterKeyHint="search"
           onKeyDown={(e) => {
@@ -61,12 +74,12 @@ export default function PlaceSearch({ onPick, onFocusChange }: { onPick: (p: Pla
           <button type="button" aria-label="Clear search" onClick={() => setQ("")} className="-mr-2 flex size-11 items-center justify-center text-ink-3">
             <X size={18} strokeWidth={2.2} aria-hidden />
           </button>
-        ) : (
+        ) : showMic ? (
           // TODO(phase-3): voice search
           <span className="flex size-8 items-center justify-center text-[#3C3C43]" aria-hidden>
             <Mic size={18} strokeWidth={2} />
           </span>
-        )}
+        ) : null}
       </label>
 
       {term.length >= 2 && (
