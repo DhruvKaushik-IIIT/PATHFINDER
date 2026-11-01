@@ -1,7 +1,8 @@
 // Server-only: "Still there?" one-tap checks (docs/event-lifecycle.md §2). Plain code, no AI.
 // A Yes confirms the event now and scales its shelf life by the answer; a No makes it Unconfirmed;
 // 3 Nos from different devices within 6 h (no full Yes after) close it early. Taps never change the status.
-import { insert, select, update } from "../db/supabase.ts";
+import { insert, select } from "../db/supabase.ts";
+import { claimVote, mutateEvent } from "./mutate.ts";
 import { closeExpired } from "./expire.ts";
 import { lifecycleOf, type Taps } from "./lifecycle.ts";
 
@@ -29,6 +30,8 @@ export interface TapResult {
   message: string;
   state?: "active" | "unconfirmed" | "closed";
 }
+
+const COLS = "id,type,status,lat,lng,confidence,last_confirmed_at,sources,eta_clear,measurements,is_demo";
 
 interface Row {
   id: string;
@@ -111,15 +114,21 @@ export async function recordTap(input: {
     "event_timeline",
     `select=id&event_id=eq.${ev.id}&data->>tapBy=eq.${input.device}&at=gte.${since}&limit=1`,
   );
-  if (prior.length) return { ok: false, code: 409, message: "You already answered for this spot. Thanks!" };
+  // Atomic claim (migration 0005): of several simultaneous taps from one phone, exactly one counts.
+  if (prior.length || !(await claimVote(ev.id, input.device, "tap", Boolean(ev.is_demo))))
+    return { ok: false, code: 409, message: "You already answered for this spot. Thanks!" };
 
-  const next = applyTap(ev.sources?.taps, ev.confidence, input.answer, input.device);
-  const now = new Date().toISOString();
-  await update("events", `id=eq.${ev.id}`, {
-    sources: { ...ev.sources, taps: next.taps },
-    confidence: next.confidence,
-    ...(next.confirms && { last_confirmed_at: now }),
-  });
+  // Applied to the FRESH row with optimistic locking: votes arriving together are all kept.
+  let next = applyTap(ev.sources?.taps, ev.confidence, input.answer, input.device);
+  const done = await mutateEvent<Row>(ev.id, COLS, (row) => {
+    next = applyTap(row.sources?.taps, row.confidence, input.answer, input.device);
+    return {
+      sources: { ...row.sources, taps: next.taps },
+      confidence: next.confidence,
+      ...(next.confirms && { last_confirmed_at: new Date().toISOString() }),
+    };
+  }, { openOnly: true });
+  if (!done) return { ok: false, code: 410, message: "This one has already been removed" };
   await insert("event_timeline", {
     event_id: ev.id,
     kind: "report",
@@ -170,17 +179,22 @@ export async function recordPass(input: { eventId: string; device: string; lat: 
   // One pass per device per event every 6 h (separate from taps, so the driver can still answer "Still there?").
   const since = new Date(Date.now() - VOTE_EVERY_H * 3_600_000).toISOString();
   const prior = await select<{ id: string }>("event_timeline", `select=id&event_id=eq.${ev.id}&data->>passBy=eq.${input.device}&at=gte.${since}&limit=1`);
-  if (prior.length) return { ok: true, code: 200, message: "already counted" };
+  if (prior.length || !(await claimVote(ev.id, input.device, "pass", Boolean(ev.is_demo))))
+    return { ok: true, code: 200, message: "already counted" };
 
-  const now = new Date().toISOString();
-  const taps = ev.sources?.taps;
-  const recent = (taps?.nos ?? []).filter((n) => Date.now() - new Date(n.at).getTime() <= VOTE_EVERY_H * 3_600_000);
-  const next: Taps = {
-    ...taps,
-    nos: [...recent, { d: input.device, at: now, w }],
-    ...(w >= 1 && { doubtAt: now, doubtReason: `A car drove through at ~${Math.round(input.avgKmh)} km/h (Drive Watch)` }),
-  };
-  await update("events", `id=eq.${ev.id}`, { sources: { ...ev.sources, taps: next }, confidence: Math.max(0.15, ev.confidence - 0.05 * w) });
+  let next: Taps = {};
+  const done = await mutateEvent<Row>(ev.id, COLS, (row) => {
+    const now = new Date().toISOString();
+    const taps = row.sources?.taps;
+    const recent = (taps?.nos ?? []).filter((n) => Date.now() - new Date(n.at).getTime() <= VOTE_EVERY_H * 3_600_000);
+    next = {
+      ...taps,
+      nos: [...recent, { d: input.device, at: now, w }],
+      ...(w >= 1 && { doubtAt: now, doubtReason: `A car drove through at ~${Math.round(input.avgKmh)} km/h (Drive Watch)` }),
+    };
+    return { sources: { ...row.sources, taps: next }, confidence: Math.max(0.15, row.confidence - 0.05 * w) };
+  }, { openOnly: true });
+  if (!done) return { ok: false, code: 410, message: "already removed" };
   await insert("event_timeline", {
     event_id: ev.id,
     kind: "report",

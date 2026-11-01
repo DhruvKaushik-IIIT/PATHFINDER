@@ -56,6 +56,16 @@ export async function insert<T>(table: string, rows: object | object[]): Promise
   return (await check(res, `insert ${table}`)).json() as Promise<T[]>;
 }
 
+/** INSERT a row unless its primary key already exists. Returns true if THIS call inserted it. */
+export async function insertIfAbsent(table: string, row: object): Promise<boolean> {
+  const res = await fetch(`${base()}/rest/v1/${table}`, {
+    method: "POST",
+    headers: { ...auth(), "Content-Type": "application/json", Prefer: "return=representation,resolution=ignore-duplicates" },
+    body: JSON.stringify(row),
+  });
+  return ((await (await check(res, `insert ${table}`)).json()) as unknown[]).length > 0;
+}
+
 /** UPDATE rows matching a PostgREST filter, e.g. update("photos", "id=eq.…", {...}). */
 export async function update<T>(table: string, filter: string, patch: object): Promise<T[]> {
   const res = await fetch(`${base()}/rest/v1/${table}?${filter}`, {
