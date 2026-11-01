@@ -4,6 +4,7 @@ Small decisions agreed in chat, newest first. Bigger designs get their own file 
 
 | Date | Decision | Where |
 |---|---|---|
+| 2026-11-01 | Recovery pass over old work: only one branch held files `main` never got — the Oct 31 Phase 7 drafts (`claude/determined-fermat-ui5oyr`, PR not merged). Copied the 4 docs here with an "out of date" banner; Phase 7 = refresh them | `docs/demo-script.md`, `docs/submission.md` |
 | 2026-11-01 | Multi-user sync: optimistic locking on `events.rev` + `event_votes` (one vote per phone per spot per 6 h, atomic) via migration 0005; data version also watches the timeline | `docs/event-lifecycle.md` |
 | 2026-11-01 | Passing traffic thresholds: closed + ≥10 km/h or jam/accident + ≥30 km/h = full "gone"; one lane/slow + ≥30 km/h = half; real GPS only. Investigator moves an event to Unconfirmed only when it cited news | `docs/event-lifecycle.md` |
 | 2026-11-01 | "Still there?" alerts go to opted-in Scouts only and share their 2-a-day budget; Drive Watch asks only about spots passed since Drive Watch started; taps are stored in `events.sources.taps` (no schema change) | `docs/event-lifecycle.md` |
