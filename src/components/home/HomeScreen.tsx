@@ -1,5 +1,6 @@
 "use client";
 
+import { liveFetch } from "@/lib/live";
 // Frame 02 Home (docs/design/glass-html/Main.dc.html): map + floating glass buttons + bottom sheet.
 import { Bell, Camera, ChevronRight, Eye, Layers, MapPin, MapPinned, MapPinOff, Navigation, Route, Target, User } from "lucide-react";
 import dynamic from "next/dynamic";
@@ -290,7 +291,7 @@ function useTop(): { text: string; dot: string } {
   const [res, setRes] = useState<TopResult | null | undefined>(undefined);
   useEffect(() => {
     let alive = true;
-    fetch("/api/top?limit=1")
+    liveFetch("/api/top?limit=1")
       .then((r) => r.json() as Promise<{ data: TopResult | null }>)
       .then((b) => alive && setRes(b.data))
       .catch(() => alive && setRes(null));

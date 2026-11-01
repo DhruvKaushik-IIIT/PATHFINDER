@@ -1,4 +1,5 @@
 // GET /api/events?bbox=W,S,E,N → open (unresolved) events inside the box, for map pins.
+import { liveCache } from "@/lib/events/version.ts";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { hasDb } from "@/lib/db/supabase.ts";
@@ -17,7 +18,7 @@ export async function GET(req: Request) {
   if (!hasDb()) return NextResponse.json({ ok: true, data: [], degraded: "database not configured" });
   try {
     // Public map data: a short CDN cache absorbs many phones panning the same area (Phase 6E).
-    return NextResponse.json({ ok: true, data: await openEventsInBbox(...parsed.data) }, { headers: { "Cache-Control": "public, s-maxage=20, stale-while-revalidate=40" } });
+    return NextResponse.json({ ok: true, data: await openEventsInBbox(...parsed.data) }, { headers: liveCache(req) });
   } catch (err) {
     console.error("[events] query failed:", (err as Error).message);
     return NextResponse.json({ ok: true, data: [], degraded: "events unavailable right now" });

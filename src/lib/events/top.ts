@@ -9,6 +9,7 @@
 //     It only re-orders events with similar reach.
 // Confidence scales the whole thing a little so a shaky news-only report can't top the list.
 import { select } from "../db/supabase.ts";
+import { dataVersion } from "./version.ts";
 import { distanceM } from "../geo/snap.ts";
 import { vehiclesPerDayOf } from "../official/impact.ts";
 import { roadLabel } from "../official/queue.ts";
@@ -87,11 +88,12 @@ export function topScore(reach: number, damage: number, confidence: number): num
 }
 
 const TTL_MS = 2 * 60_000;
-let cache: { at: number; data: TopResult } | null = null;
+let cache: { at: number; v: string; data: TopResult } | null = null;
 
 /** Throws only on database errors (the API route degrades). */
 export async function topAcrossHimachal(limit = 10, now = Date.now()): Promise<TopResult> {
-  if (cache && now - cache.at < TTL_MS) return { ...cache.data, items: cache.data.items.slice(0, limit) };
+  const v = await dataVersion().catch(() => "");
+  if (cache && cache.v === v && now - cache.at < TTL_MS) return { ...cache.data, items: cache.data.items.slice(0, limit) };
   const [w, s, e, n] = HP;
   const [rows, trips] = await Promise.all([
     select<Row>(
@@ -144,6 +146,6 @@ export async function topAcrossHimachal(limit = 10, now = Date.now()): Promise<T
     .map((x, i) => ({ ...x, rank: i + 1 }));
 
   const data: TopResult = { items, counts, total: live.length, checkedAt: new Date(now).toISOString() };
-  cache = { at: now, data };
+  cache = { at: now, v, data };
   return { ...data, items: items.slice(0, limit) };
 }

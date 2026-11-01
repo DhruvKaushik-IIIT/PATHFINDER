@@ -19,7 +19,7 @@ const Fields = z.object({
   status: z.enum(["clearing", "one_lane", "open"]),
   pctCleared: z.coerce.number().int().min(0).max(100),
   fullyOpenBy: z.string().regex(/^\d{1,2}:\d{2}$/).nullable(),
-  machines: z.string().max(200),
+  machines: z.string().max(1000).transform((s) => (s.length > 300 ? `${s.slice(0, 297)}…` : s)),
 });
 
 export async function POST(req: Request) {
@@ -43,7 +43,11 @@ export async function POST(req: Request) {
     fullyOpenBy: form.get("fullyOpenBy") || null,
     machines: form.get("machines") ?? "",
   });
-  if (!f.success) return NextResponse.json({ ok: false, error: "Check the status, % cleared and time." }, { status: 400 });
+  if (!f.success) {
+    const field = String(f.error.issues[0]?.path[0] ?? "");
+    const what: Record<string, string> = { status: "the status", pctCleared: "% cleared", fullyOpenBy: "the \"fully open by\" time", machines: "the machines list", eventId: "the event" };
+    return NextResponse.json({ ok: false, error: `Check ${what[field] ?? "the form"} and try again.` }, { status: 400 });
+  }
   try {
     const data = await postFieldUpdate(official, {
       ...f.data,

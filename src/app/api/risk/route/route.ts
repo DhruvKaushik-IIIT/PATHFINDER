@@ -1,5 +1,6 @@
 // GET /api/risk/route?from=lat,lng&to=lat,lng[&fromName&toName&depart][&replay=1] → RouteRisk (no AI).
 // Reuses the planner's 3-min plan cache, so after /api/route this costs one Open-Meteo request.
+import { liveCache } from "@/lib/events/version.ts";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { planRoute } from "@/lib/geo/route.ts";
@@ -35,7 +36,7 @@ export async function GET(req: Request) {
       depart ? new Date(depart) : new Date(),
     );
     const data = await routeRisk(plan, { replay });
-    return NextResponse.json({ ok: true, data, ...(q.data.replay === "1" && !replay && { degraded: "no weather replay saved — showing the live forecast" }) }, { headers: { "Cache-Control": "public, s-maxage=600, stale-while-revalidate=1800" } });
+    return NextResponse.json({ ok: true, data, ...(q.data.replay === "1" && !replay && { degraded: "no weather replay saved — showing the live forecast" }) }, { headers: liveCache(req, 600) });
   } catch (err) {
     console.error("[risk/route] failed:", (err as Error).message);
     return NextResponse.json({ ok: true, data: null, degraded: "Rain forecast unavailable right now" });

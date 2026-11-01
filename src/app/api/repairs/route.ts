@@ -1,4 +1,5 @@
 // GET /api/repairs?ids=a,b,c → crews at work + latest official progress for those events (public, no AI).
+import { liveCache } from "@/lib/events/version.ts";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { hasDb } from "@/lib/db/supabase.ts";
@@ -12,7 +13,7 @@ export async function GET(req: Request) {
   if (!ids.success) return NextResponse.json({ ok: false, error: "ids must be up to 40 event ids" }, { status: 400 });
   if (!hasDb()) return NextResponse.json({ ok: true, data: [], degraded: "database not configured" });
   try {
-    return NextResponse.json({ ok: true, data: await repairsFor(ids.data) }, { headers: { "Cache-Control": "public, s-maxage=20, stale-while-revalidate=40" } });
+    return NextResponse.json({ ok: true, data: await repairsFor(ids.data) }, { headers: liveCache(req) });
   } catch (err) {
     console.error("[repairs] failed:", (err as Error).message);
     return NextResponse.json({ ok: true, data: [], degraded: "Repair updates unavailable right now" });

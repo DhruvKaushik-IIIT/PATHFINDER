@@ -1,4 +1,5 @@
 // GET /api/nearby?lat&lng&radiusKm[&name][&summary=0] → open events within the radius, ranked, + a short summary.
+import { liveCache } from "@/lib/events/version.ts";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { hasDb } from "@/lib/db/supabase.ts";
@@ -30,7 +31,7 @@ export async function GET(req: Request) {
     const aiMissing = summary === "1" && data.summaryBy === "code" && data.items.length > 0;
     return NextResponse.json(
       { ok: true, data, ...(aiMissing && { degraded: "AI summary unavailable right now" }) },
-      aiMissing ? undefined : { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" } },
+      { headers: aiMissing ? { "Cache-Control": "no-store" } : liveCache(req) },
     );
   } catch (err) {
     console.error("[nearby] failed:", (err as Error).message);

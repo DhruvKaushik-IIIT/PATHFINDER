@@ -1,5 +1,6 @@
 "use client";
 
+import { liveFetch } from "@/lib/live";
 // Frames 06 / 06b Photos for a road event: loads the event and hands its photos to the shared dark viewer.
 import { useEffect, useState } from "react";
 import { approxRange, clearWindow } from "@/lib/events/format";
@@ -14,7 +15,7 @@ export default function PhotosScreen({ id }: { id: string }) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch(`/api/events/${id}`)
+    liveFetch(`/api/events/${id}`)
       .then((r) => r.json())
       .then((b: { data?: EventDetail | null; error?: string }) => (b.data ? setEv(b.data) : setError(b.error ?? "Photos unavailable")))
       .catch(() => setError("Photos unavailable"));
