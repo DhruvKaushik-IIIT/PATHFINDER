@@ -1,12 +1,12 @@
 // POST /api/official/slopes/[id]/inspect → "Send crew to inspect" (timeline item only; officials, own district).
 import { NextResponse } from "next/server";
-import { requireOfficial } from "@/lib/official/guard.ts";
+import { requireOffice } from "@/lib/official/guard.ts";
 import { sendInspection } from "@/lib/slope/inspect.ts";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(_req: Request, { params }: { params: Promise<{ id: string }> }) {
-  const official = await requireOfficial();
+  const official = await requireOffice();
   if (official instanceof NextResponse) return official;
   const { id } = await params;
   try {

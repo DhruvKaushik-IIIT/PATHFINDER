@@ -20,6 +20,8 @@ export interface Official {
   district: District;
   /** Demo account → everything it writes is is_demo (wiped by `pnpm seed --wipe`). */
   isDemo: boolean;
+  /** Crew accounts only: their worker row, crew and that crew's current job (Option B). */
+  worker?: { id: string; crewId: string | null; eventId: string | null } | null;
 }
 
 function authBase(): string {
@@ -69,6 +71,14 @@ async function staffRow(authId: string): Promise<Official | null> {
     `select=id,display_name,role,org,district,is_demo&auth_user_id=eq.${authId}&limit=1`,
   );
   if (!u || !STAFF.has(u.role)) return null;
+  let worker: Official["worker"] = null;
+  if (u.role === "crew") {
+    const [w] = await select<{ id: string; crew_id: string | null; crews: { current_event_id: string | null } | null }>(
+      "workers",
+      `select=id,crew_id,crews!workers_crew_id_fkey(current_event_id)&user_id=eq.${u.id}&limit=1`,
+    );
+    worker = w ? { id: w.id, crewId: w.crew_id, eventId: w.crews?.current_event_id ?? null } : null;
+  }
   return {
     userId: u.id,
     name: u.display_name ?? u.org ?? "Official",
@@ -76,6 +86,7 @@ async function staffRow(authId: string): Promise<Official | null> {
     org: u.org ?? "Official",
     district: districtOf(u.district),
     isDemo: u.is_demo,
+    worker,
   };
 }
 

@@ -73,6 +73,11 @@ export default function CommandCentreScreen() {
           router.replace("/official/login");
           return;
         }
+        if (res.status === 403) {
+          // Crew accounts have their own "My job" screen (Option B).
+          router.replace("/crew");
+          return;
+        }
         const j = (await res.json()) as { ok: boolean; data?: CommandCentre; degraded?: string; error?: string };
         if (!alive) return;
         if (!j.ok || !j.data) {

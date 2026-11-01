@@ -23,20 +23,21 @@ export default function LoginScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function submit(e: React.FormEvent | null, demo = false) {
+  async function submit(e: React.FormEvent | null, demo: false | "office" | "crew" = false) {
     e?.preventDefault();
     setBusy(true);
     setError(null);
     try {
       // Demo: one tap for judges (public read-mostly account); otherwise the typed Department ID + password.
-      const res = await fetch(demo ? "/api/official/demo" : "/api/official/login", {
+      const res = await fetch(demo ? `/api/official/demo${demo === "crew" ? "?as=crew" : ""}` : "/api/official/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: demo ? "{}" : JSON.stringify({ deptId, password }),
       });
-      const j = (await res.json()) as { ok: boolean; error?: string };
+      const j = (await res.json()) as { ok: boolean; error?: string; data?: { role?: string } };
       if (j.ok) {
-        router.replace("/official");
+        // Office staff → Command Centre; on-site workers → their own "My job" screen.
+        router.replace(j.data?.role === "crew" ? "/crew" : "/official");
         return;
       }
       setError(j.error ?? "Sign-in failed.");
@@ -117,14 +118,25 @@ export default function LoginScreen() {
           <button
             type="button"
             disabled={busy}
-            onClick={() => void submit(null, true)}
-            className="flex min-h-[48px] items-center justify-center rounded-[14px] bg-accent-tint text-[16px] font-semibold text-accent-tint-ink disabled:opacity-60"
+            onClick={() => void submit(null, "office")}
+            className="flex min-h-[48px] flex-col items-center justify-center rounded-[14px] bg-accent-tint px-3 py-1.5 text-accent-tint-ink disabled:opacity-60"
           >
-            Try as PWD Mandi (demo)
+            <span className="text-[16px] font-semibold">Try as PWD Mandi office (demo)</span>
+            <span className="text-[12px]">Command Centre · priority queue, dispatch, advisories</span>
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void submit(null, "crew")}
+            className="flex min-h-[48px] flex-col items-center justify-center rounded-[14px] bg-accent-tint px-3 py-1.5 text-accent-tint-ink disabled:opacity-60"
+          >
+            <span className="text-[16px] font-semibold">Try as on-site crew (demo)</span>
+            <span className="text-[12px]">Rajesh Thakur · Crew A supervisor at the Aut slide</span>
           </button>
           <p className="m-0 text-center text-[12px] leading-[1.45] text-ink-2">
-            Demo account <span className="whitespace-nowrap font-mono">PWD-MANDI-DEMO</span> / <span className="whitespace-nowrap font-mono">himachal-demo</span>: demo data for Mandi
-            district only — its advisories reach demo devices and your own phone, never real travellers.
+            Demo accounts <span className="whitespace-nowrap font-mono">PWD-MANDI-DEMO</span> / <span className="whitespace-nowrap font-mono">himachal-demo</span> and{" "}
+            <span className="whitespace-nowrap font-mono">CREW-MANDI-DEMO</span> / <span className="whitespace-nowrap font-mono">himachal-crew</span>: demo data for Mandi
+            district only (fictional people) — advisories reach demo devices and your own phone, never real travellers.
           </p>
         </div>
       </form>
