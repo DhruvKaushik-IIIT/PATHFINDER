@@ -29,6 +29,9 @@ export interface SubmitInput {
   scoutRequestId?: string | null;
   /** When a library photo was taken (EXIF / file time, sent by the browser). Camera shots: null = now. */
   takenAt?: string | null;
+  /** Placed on the map by someone not at the spot ("Pick a spot", B1): same AI pipeline, but demo data,
+   *  no points, never touches real events. */
+  placed?: boolean;
 }
 
 export interface SubmitResult {
@@ -43,6 +46,8 @@ export interface SubmitResult {
   lat: number;
   lng: number;
   reportStatus: EventResult["reportStatus"];
+  /** Placed on the map (demo report, no points). */
+  placed: boolean;
   publicUrl: string;
   annotatedUrl: string | null;
   placeName: string | null;
@@ -71,6 +76,8 @@ export async function submitReport(input: SubmitInput): Promise<SubmitResult> {
   const timings: Record<string, number> = {};
   const degraded: string[] = [];
   const { photo, lat, lng, text } = input;
+  const placed = Boolean(input.placed);
+  const demo = placed ? { is_demo: true } : {};
   // Time-consistency: a clock in the future (bad phone time) is ignored.
   const takenMs = input.takenAt ? Date.parse(input.takenAt) : NaN;
   const photoAgeH = Number.isFinite(takenMs) && takenMs < Date.now() + 3_600_000 ? Math.max(0, (Date.now() - takenMs) / 3_600_000) : null;
@@ -141,6 +148,7 @@ export async function submitReport(input: SubmitInput): Promise<SubmitResult> {
     transcript,
     transcript_lang: transcript ? (DEVANAGARI.test(transcript) ? "hi" : "en") : null,
     status: "pending",
+    ...demo,
   });
   const id = report!.id;
   const publicPath = `${id}${p.facesBlurred ? "" : "-thumb"}.jpg`;
@@ -162,16 +170,18 @@ export async function submitReport(input: SubmitInput): Promise<SubmitResult> {
     measurements: p.measurements,
     faces_blurred: p.facesBlurred,
     source: input.scoutRequestId ? "scout" : "traveller",
+    ...demo,
   });
   if (claims.length) {
     await insert(
       "claims",
       // The verifier's view rides on the photo's own claim (no schema change): agreement stats read it.
-      claims.map((c) => ({ report_id: id, source: "photo", payload: c === here && verification ? { ...c, verification } : c, confidence: c.confidence })),
+      claims.map((c) => ({ report_id: id, source: "photo", payload: c === here && verification ? { ...c, verification } : c, confidence: c.confidence, ...demo })),
     );
   }
   // Claims about OTHER places (voice note): evidence on a nearby open event's timeline, never a new event.
-  const mentions = await noteMentions(claims, id).catch((err: Error) => {
+  // A report placed on the map never adds evidence to real events.
+  const mentions = placed ? [] : await noteMentions(claims, id).catch((err: Error) => {
     console.warn("[reports] mentions failed:", err.message);
     return [];
   });
@@ -181,7 +191,7 @@ export async function submitReport(input: SubmitInput): Promise<SubmitResult> {
     ev = await applyToWorldState({
       claim: here, verdict, verifiedBy: verifiedBy!, modelsAgreed,
       segmentId: snap.segment?.id ?? null, placeName: snap.placeName, lat, lng,
-      reportId: id, photoUrl: pubUrl, sam: p.measurements, verification, photoAgeH,
+      reportId: id, photoUrl: pubUrl, sam: p.measurements, verification, photoAgeH, placed,
     });
   }
 
@@ -196,7 +206,7 @@ export async function submitReport(input: SubmitInput): Promise<SubmitResult> {
       const agree = modelsAgreed >= 2 ? " · 2 AI models agree" : "";
       const jpeg = await annotate({
         jpeg: p.public, width: p.width, height: p.height, sam: p.samResults, claim: shown,
-        title, subtitle: `${time} · Traveller${conf}${agree}`,
+        title, subtitle: `${time} · ${placed ? "Placed on map (demo)" : "Traveller"}${conf}${agree}`,
       });
       await upload("photos-public", `${id}-annotated.jpg`, jpeg, "image/jpeg");
       annotatedUrl = publicUrl("photos-public", `${id}-annotated.jpg`);
@@ -206,9 +216,10 @@ export async function submitReport(input: SubmitInput): Promise<SubmitResult> {
     }
   }
 
-  const scoutBonus = input.scoutRequestId && ev.reportStatus !== "rejected" ? await fulfilScoutRequest(input.scoutRequestId, id) : 0;
-  const points = pointsFor(ev, verdict) + scoutBonus;
-  if (input.userId) await creditUser(input.userId, points, { lat, lng }).catch((err: Error) => console.warn("[reports] points failed:", err.message));
+  // Placed on the map: demo report → no points (the leaderboard is for reports made at the spot).
+  const scoutBonus = !placed && input.scoutRequestId && ev.reportStatus !== "rejected" ? await fulfilScoutRequest(input.scoutRequestId, id) : 0;
+  const points = placed ? 0 : pointsFor(ev, verdict) + scoutBonus;
+  if (input.userId && !placed) await creditUser(input.userId, points, { lat, lng }).catch((err: Error) => console.warn("[reports] points failed:", err.message));
   await Promise.all([
     update("reports", `id=eq.${id}`, { status: ev.reportStatus, event_id: ev.eventId, points_awarded: points }),
     update("photos", `id=eq.${photoRow!.id}`, { event_id: ev.eventId, annotated_url: annotatedUrl }),
@@ -226,6 +237,7 @@ export async function submitReport(input: SubmitInput): Promise<SubmitResult> {
     lat,
     lng,
     reportStatus: ev.reportStatus,
+    placed,
     publicUrl: pubUrl,
     annotatedUrl,
     placeName: snap.placeName,

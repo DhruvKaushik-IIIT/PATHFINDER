@@ -54,7 +54,7 @@ export async function askStillThereForUser(user: { id: string; coarse_lat: numbe
       r,
       life: lifecycleOf({
         type: r.type, status: r.status, lastConfirmedAt: r.last_confirmed_at, reports: r.sources?.reports, official: r.sources?.official,
-        news: r.sources?.news, isDemo: r.is_demo, etaClear: r.eta_clear, potholeSize: r.measurements?.potholeSize, taps: r.sources?.taps,
+        news: r.sources?.news, isDemo: r.is_demo, placed: Boolean((r.sources as { placed?: boolean } | null)?.placed), etaClear: r.eta_clear, potholeSize: r.measurements?.potholeSize, taps: r.sources?.taps,
       }),
     }))
     // Unconfirmed first, then active ones at least a quarter into their shelf life (fresh ones don't need asking).

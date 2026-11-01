@@ -42,12 +42,12 @@ export interface SweepResult {
   keptForCrew: number;
 }
 
-/** Find open real (non-demo) events past their shelf life and close them. Events with a crew working
+/** Find open real (non-demo) events — plus demo events placed on the map, which expire like real ones — past their shelf life and close them. Events with a crew working
  *  on them are never auto-closed (an official is handling it; they show as Unconfirmed instead). */
 export async function sweepExpired(): Promise<SweepResult> {
   const rows = await select<Row>(
     "events",
-    "select=id,type,status,lat,lng,last_confirmed_at,sources,eta_clear,measurements&resolved_at=is.null&is_demo=is.false&order=last_confirmed_at.asc&limit=1000",
+    "select=id,type,status,lat,lng,last_confirmed_at,sources,eta_clear,measurements&resolved_at=is.null&or=(is_demo.is.false,sources->>placed.eq.true)&order=last_confirmed_at.asc&limit=1000",
   );
   const expired = rows
     .map((r) => ({

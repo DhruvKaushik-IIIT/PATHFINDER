@@ -30,6 +30,8 @@ interface Result {
   eventReports: number;
   points: number;
   scoutBonus?: number;
+  /** "Pick a spot" (B1): placed on the map, demo report. */
+  placed?: boolean;
   placeName: string | null;
   road: { ref: string | null; name: string | null } | null;
   claims: { eventType: string; status: string; measurements: { blockedPct: { min: number; max: number } | null } }[];
@@ -176,6 +178,12 @@ export default function ReportDone() {
             </div>
           )}
         </div>
+
+        {result.placed && (
+          <p className="m-0 rounded-[14px] bg-accent-tint px-[14px] py-3 text-[13px] leading-[1.45] text-accent-tint-ink">
+            Placed on the map (demo): same AI checks as a real report, but no points and it never changes real road data.
+          </p>
+        )}
 
         {result.points > 0 && (
           <div className="flex items-center gap-[10px] rounded-[14px] bg-white/84 px-[14px] py-3">

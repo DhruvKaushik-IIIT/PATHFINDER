@@ -25,6 +25,7 @@ _Format: ID · date · area · steps · expected · actual · likely cause · se
 - **Actual (from code + `/api/snap` on Delhi coords):** `ReportScreen.tsx` uses `navigator.geolocation` only (the `?lat&lng` fallback works only for slope links when location is denied). A Delhi report snaps to no road (`placeName null`) and creates an event in Delhi, outside any district, so it never reaches the PWD Mandi queue. Outside lat 26–35 / India (e.g. a judge in the US) `POST /api/reports` rejects it (zod `lat.min(26).max(35)`).
 - **Likely cause:** design assumes the reporter stands at the incident; no "pick location on map" option.
 - **Severity:** major for the judges' demo / remote testing (fine for real use).
+- **Status: FIXED (Nov 2, option A, Dhruv said "fix it")** — "Not in Himachal? Pick a spot" on /report (`components/report/PickSpot.tsx`): opens by itself when GPS is off or outside Himachal (or tap the location pill); 5 demo spots in PWD Mandi's district or "Drop a pin on the map" (snaps to our road layer). Report = demo data marked "placed on map (demo)", same AI checks, no points, never touches real events, expires like a real report. Verified locally (Playwright, GPS = Delhi → Mandi spot → library photo → accepted, 2 models agree, 30 s, event is_demo + placed, in the PWD Mandi queue, lifecycle expires in 24 h; far-off pin → 422). Test event resolved afterwards. Live only after merge to main.
 
 
 ### F1 run · Nov 1 ~1:25–1:35 AM IST (verified in the DB)

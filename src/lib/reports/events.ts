@@ -48,6 +48,9 @@ export interface EventUpdate {
   photoAgeH?: number | null;
   /** SAM's own numbers for the photo (road width, etc.), merged under the claim's. */
   sam?: { roadTotalWidthM?: Range; blockedLengthM?: Range; blockedPct?: Range } | null;
+  /** Placed on the map by someone not at the spot (/report "Pick a spot", B1): demo data — it only merges into
+   *  demo events (never touches real ones) and a new event is is_demo + sources.placed (expires like a real one). */
+  placed?: boolean;
 }
 
 export interface EventResult {
@@ -69,13 +72,13 @@ async function findOpenEvent(u: EventUpdate): Promise<EventRow | null> {
     : `lat=gte.${u.lat - NEAR_DEG}&lat=lte.${u.lat + NEAR_DEG}&lng=gte.${u.lng - NEAR_DEG}&lng=lte.${u.lng + NEAR_DEG}`;
   const [row] = await select<EventRow>(
     "events",
-    `select=${cols}&${where}&resolved_at=is.null&order=last_confirmed_at.desc&limit=1`,
+    `select=${cols}&${where}&resolved_at=is.null${u.placed ? "&is_demo=is.true" : ""}&order=last_confirmed_at.desc&limit=1`,
   );
   if (!row) return null;
   const life = lifecycleOf({
     type: row.type, status: row.status, lastConfirmedAt: row.last_confirmed_at, reports: row.sources?.reports,
     official: row.sources?.official, news: row.sources?.news, etaClear: row.eta_clear, potholeSize: row.measurements?.potholeSize,
-    isDemo: row.is_demo, taps: (row.sources as { taps?: Taps } | null)?.taps,
+    isDemo: row.is_demo, placed: Boolean((row.sources as { placed?: boolean } | null)?.placed), taps: (row.sources as { taps?: Taps } | null)?.taps,
   });
   if (life.state === "expired") {
     await closeExpired([{ id: row.id, reason: life.reason }]).catch(() => {});
@@ -134,7 +137,8 @@ export async function applyToWorldState(u: EventUpdate): Promise<EventResult> {
       event_id: eventId,
       kind: "report",
       text,
-      actor: "Traveller",
+      actor: u.placed ? "Traveller · placed on map (demo)" : "Traveller",
+      ...(u.placed && { is_demo: true }),
       data: {
         reportId: u.reportId, photoUrl: u.photoUrl, status, type,
         verdict: verdict.verdict, verifiedBy: u.verifiedBy, modelsAgreed: u.modelsAgreed,
@@ -169,8 +173,9 @@ export async function applyToWorldState(u: EventUpdate): Promise<EventResult> {
       confidence: conf,
       started_at: now,
       last_confirmed_at: now,
-      sources: { reports: 1, official: 0, news: 0, notices: 0 },
+      sources: { reports: 1, official: 0, news: 0, notices: 0, ...(u.placed && { placed: true }) },
       models_agreed: u.modelsAgreed,
+      ...(u.placed && { is_demo: true }),
     });
     await timeline(ev!.id, `Reported: ${claim.summary}`);
     return { eventId: ev!.id, action: "created", reportStatus: "accepted", eventReports: 1 };
