@@ -91,6 +91,8 @@ export default function DriveScreen() {
   const lastFix = useRef<{ t: number; lat: number; lng: number } | null>(null);
   const speedKmh = useRef<number | null>(null);
   const startKm = useRef<number | null>(null); // only spots you actually drove past count
+  // Passing traffic (docs/event-lifecycle.md §3): time across a 600 m window centred on each spot.
+  const passes = useRef(new Map<string, { t: number; km: number; maxOff: number; sent?: boolean }>());
 
   const announced = useRef(new Set<string>());
   const known = useRef(new Map<string, Hazard>());
@@ -237,6 +239,29 @@ export default function DriveScreen() {
         for (const e of passed) asked.current.add(e.id);
         setAskQueue((q) => [...q, ...passed]);
       }
+      // Drove THROUGH a reported spot? Real GPS only — a simulated drive is never evidence.
+      if (!simulate) {
+        for (const e of askable) {
+          const tr = passes.current.get(e.id);
+          if (tr?.sent) continue;
+          const inside = p.alongKm >= e.alongKm - 0.3 && p.alongKm < e.alongKm + 0.3;
+          if (inside && !tr) passes.current.set(e.id, { t: now, km: p.alongKm, maxOff: p.offKm });
+          else if (inside && tr) tr.maxOff = Math.max(tr.maxOff, p.offKm);
+          else if (tr && p.alongKm >= e.alongKm + 0.3) {
+            tr.sent = true;
+            const dKm = p.alongKm - tr.km;
+            const hours = (now - tr.t) / 3_600_000;
+            // Entered before the spot, stayed on this road, measured over ≥400 m.
+            if (tr.km <= e.alongKm && tr.maxOff <= 0.15 && dKm >= 0.4 && hours > 0) {
+              fetch(`/api/events/${e.id}/passed`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ lat, lng, avgKmh: Math.min(200, dKm / hours) }),
+              }).catch(() => {});
+            }
+          }
+        }
+      }
       meKm.current = p.alongKm;
       setMe({ lat, lng, km: p.alongKm, offKm: p.offKm });
       if (p.offKm > OFF_ROUTE_KM) return; // off the planned road: distances would be wrong
@@ -365,6 +390,7 @@ export default function DriveScreen() {
     wake.start();
     announced.current.clear();
     startKm.current = null;
+    passes.current.clear();
     setFollow(true);
     setStarted(true);
   }

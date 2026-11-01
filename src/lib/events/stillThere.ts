@@ -145,3 +145,55 @@ export async function recordTap(input: {
       : "Thanks! It now shows as unconfirmed. If others agree, it's removed.",
   };
 }
+
+// ---------------------------------------------------------------- passing traffic (Part C)
+// A Drive Watch phone (real GPS, never simulated) that drove THROUGH the spot at normal speed is free
+// evidence the road is open there. Timed over a 600 m window centred on the spot, on the route.
+
+/** Weight of one pass as a "gone" vote: 0 = says nothing. Exported for tests. */
+export function passWeight(type: string, status: string, avgKmh: number): number {
+  if (status === "closed") return avgKmh >= 10 ? 1 : 0; // nobody drives through a closed road
+  if (avgKmh < 30) return 0; // crawling past is consistent with one lane / a jam
+  if (type === "traffic" || type === "accident") return 1; // the jam is gone
+  return 0.5; // one lane / slow: normal speed suggests it cleared, but one-lane traffic does move
+}
+
+export async function recordPass(input: { eventId: string; device: string; lat: number; lng: number; avgKmh: number }): Promise<TapResult> {
+  const [ev] = await select<Row>(
+    "events",
+    `select=id,type,status,lat,lng,confidence,last_confirmed_at,sources,eta_clear,measurements,is_demo&id=eq.${input.eventId}&resolved_at=is.null&limit=1`,
+  );
+  if (!ev) return { ok: false, code: 410, message: "already removed" };
+  if (km(ev, input) > 0.5) return { ok: false, code: 403, message: "not at the spot" };
+  const w = passWeight(ev.type, ev.status, input.avgKmh);
+  if (!w) return { ok: true, code: 200, message: "slow pass, no signal" };
+  // One pass per device per event every 6 h (separate from taps, so the driver can still answer "Still there?").
+  const since = new Date(Date.now() - VOTE_EVERY_H * 3_600_000).toISOString();
+  const prior = await select<{ id: string }>("event_timeline", `select=id&event_id=eq.${ev.id}&data->>passBy=eq.${input.device}&at=gte.${since}&limit=1`);
+  if (prior.length) return { ok: true, code: 200, message: "already counted" };
+
+  const now = new Date().toISOString();
+  const taps = ev.sources?.taps;
+  const recent = (taps?.nos ?? []).filter((n) => Date.now() - new Date(n.at).getTime() <= VOTE_EVERY_H * 3_600_000);
+  const next: Taps = {
+    ...taps,
+    nos: [...recent, { d: input.device, at: now, w }],
+    ...(w >= 1 && { doubtAt: now, doubtReason: `A car drove through at ~${Math.round(input.avgKmh)} km/h (Drive Watch)` }),
+  };
+  await update("events", `id=eq.${ev.id}`, { sources: { ...ev.sources, taps: next }, confidence: Math.max(0.15, ev.confidence - 0.05 * w) });
+  await insert("event_timeline", {
+    event_id: ev.id,
+    kind: "report",
+    text: `Drive Watch: a car passed through at ~${Math.round(input.avgKmh)} km/h${w >= 1 ? " — looks open" : ""}`,
+    actor: "Drive Watch (automatic)",
+    data: { pass: true, passBy: input.device, avgKmh: Math.round(input.avgKmh), weight: w },
+  });
+  const nw = noWeight(next.nos);
+  if (!ev.is_demo && nw.weight >= CLOSE_AT) {
+    await closeExpired([{ id: ev.id, reason: `Closed early: ${nw.devices} travellers passed through it or said it's gone` }]);
+    const { roadWatchAfterChange } = await import("../watch/roadWatch.ts");
+    await roadWatchAfterChange([{ lat: ev.lat, lng: ev.lng }]).catch(() => {});
+    return { ok: true, code: 200, message: "closed early", state: "closed" };
+  }
+  return { ok: true, code: 200, message: "counted", state: w >= 1 ? "unconfirmed" : "active" };
+}

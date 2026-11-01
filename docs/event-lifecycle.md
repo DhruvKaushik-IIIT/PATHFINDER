@@ -1,6 +1,6 @@
 # Event lifecycle: shelf life, "Still there?", auto-close
 
-> Design agreed with Dhruv on Nov 1, 2026. Parts A and B built Nov 1 (see bottom); C not yet.
+> Design agreed with Dhruv on Nov 1, 2026. Parts A, B and C built Nov 1 (see bottom).
 
 ## Why
 Pathfinder is not yet used by PWD, so nobody may tell us when a road is cleared.
@@ -85,7 +85,7 @@ Hindi buttons follow the app language (हाँ / नहीं, हट गय�
 
 ## 3. Passing traffic (Drive Watch)
 If Drive Watch users pass the spot at normal speed, the road is open there → counts like a "No" vote. Free, no AI.
-Details (speed threshold, how many passes) decided when building Part C.
+Decided in Part C: timed over a 600 m window centred on the spot (entered before it, stayed ≤150 m off the route, measured over ≥400 m). Closed road + ≥10 km/h → counts as a full No; traffic jam / accident + ≥30 km/h → full No; one lane / slow / other + ≥30 km/h → half a No; slower → no signal. One pass per device per event per 6 h. Real GPS only, never a simulated drive.
 
 ## 4. Investigator + news
 If the Investigator finds news that the road reopened → the event goes straight to **Unconfirmed**. Still never closes it.
@@ -108,7 +108,7 @@ If the Investigator finds news that the road reopened → the event goes straigh
 |---|---|---|
 | A | Shelf life, Unconfirmed state, auto-close, pothole sizes | ✅ Nov 1 |
 | B | "Still there?" taps | ✅ Nov 1 |
-| C | Drive Watch passing traffic + Investigator news → Unconfirmed | ⬜ |
+| C | Drive Watch passing traffic + Investigator news → Unconfirmed | ✅ Nov 1 |
 
 ## Part A — how it was built (Nov 1)
 - `src/lib/events/lifecycle.ts`: `shelfLifeH()` + `lifecycleOf()` (pure, client-safe). Tests: `pnpm test:lifecycle` (20 checks).
@@ -131,3 +131,9 @@ If the Investigator finds news that the road reopened → the event goes straigh
 - **Drive Watch:** every issue on the chosen route incl. Unconfirmed ones; spots passed since you started (≤15 km back) are queued; asked when GPS speed ≤ 20 km/h (GPS speed, else from fixes) and no hazard banner; auto-hides after 20 s; at **End drive** the remaining questions are asked first, then back to /route. Simulate mode asks at End drive (answers as if at the spot, labelled SIMULATED).
 - **Alerts:** `lib/scout/stillThere.ts` on a scout's location ping (`/api/me/location`, only when no photo request was sent): opted-in, location on, ≤20 km/h, shares the 2-a-day Scout budget; event within ~2.5 km, Unconfirmed first, else ≥¼ into its shelf life; never the same event twice; demo events only for demo users. Alert kind `scout_request` with `data.stillThere` → inline card in /alerts.
 - **Tests:** `pnpm test:lifecycle` (32 checks incl. 12 for taps). HTTP e2e on throwaway events: Yes·partly → confirmed now, shelf life 24 h; 1 No → Unconfirmed; same device again → 409; 3rd device's No → closed early + timeline; far → 403, 45 km/h → 422, removed → 410; alert: 40 km/h → none, stopped → asked, again → none. Screenshots: event page card (both steps), Drive Watch End-drive card, /alerts card. Test rows marked is_demo.
+
+## Part C — how it was built (Nov 1)
+- **Passing traffic:** `passWeight()` + `recordPass()` in `lib/events/stillThere.ts`, `POST /api/events/[id]/passed {lat, lng, avgKmh}` (rate bucket `tap`; ≤0.5 km from the spot; one per device per 6 h via `data.passBy`, separate from taps so the driver can still answer "Still there?"). A pass is a No vote in `sources.taps.nos` (weight 1 or ½; same device's pass + tap count once); a full-weight pass makes the event Unconfirmed with the reason "A car drove through at ~52 km/h (Drive Watch)"; confidence −0.05 × weight; timeline "Drive Watch: a car passed through at ~52 km/h — looks open" (actor "Drive Watch (automatic)"). 3 weight → closed early "…passed through it or said it's gone".
+  Drive Watch (`DriveScreen.tsx`): for every issue on the chosen route, records time + km when you enter the window and posts the average speed when you leave it.
+- **Investigator news:** when the Investigator's finding is `likely_cleared` (or `likely_changed` → open) AND it cited news URLs, it sets `sources.taps.doubtAt/doubtReason` ("Recent news says the road has reopened (AI check)") → Unconfirmed at once. A later photo/Yes wins. It still never closes or changes the status.
+- **Tests:** `pnpm test:lifecycle` 40 ✓ (6 pass weights, 2 doubt rules). Live: crawl 5 km/h → no signal; 40/35/50 km/h from 3 devices through a closed spot → closed early with timeline; same device twice → counted once; 2 km away → refused. Browser: fake real-GPS drive (Playwright geolocation, ~54 km/h) through a traffic jam on NH-3 → Drive Watch posted avgKmh ≈ 52 → event Unconfirmed. The Investigator news path is covered by the rule test only (a live run needs real news and costs ~$0.02).

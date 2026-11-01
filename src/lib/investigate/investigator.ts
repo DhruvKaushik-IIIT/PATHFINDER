@@ -3,6 +3,7 @@
 // Code decides what that changes: confidence moves at most ±0.15 per run, the STATUS never changes
 // (only new evidence — a photo, an official update, a news item — does that), a suspected change is
 // flagged on the timeline and turned into a scout photo request.
+import type { Taps } from "../events/lifecycle.ts";
 import { groundedSearch, investigate } from "../ai/router.ts";
 import { ist } from "../ai/tools/routeCheck.ts";
 import { runInvestigateTool, type InvestigatedEvent, type InvestigateContext } from "../ai/tools/investigate.ts";
@@ -145,7 +146,17 @@ export async function investigateEvent(id: string, opts: { force?: boolean } = {
     data: { ...note, reason, trace: res.data.trace, title: eventTitle(ev.type, ev.place_name) },
     is_demo: ev.is_demo ?? false,
   });
-  if (after !== ev.confidence) await update("events", `id=eq.${ev.id}`, { confidence: after });
+  // Part C (docs/event-lifecycle.md §4): cited news says it reopened → Unconfirmed at once (no delay on routes).
+  // The Investigator still never closes or changes the status; shelf life / taps / a photo decide that.
+  const newsSaysOpen =
+    f && ctx.citedUrls.size > 0 && (f.finding === "likely_cleared" || (f.finding === "likely_changed" && f.suggestedStatus === "open"));
+  if (newsSaysOpen) {
+    const taps = (ev.sources as { taps?: Taps } | null)?.taps;
+    await update("events", `id=eq.${ev.id}`, {
+      confidence: after,
+      sources: { ...ev.sources, taps: { ...taps, doubtAt: new Date().toISOString(), doubtReason: "Recent news says the road has reopened (AI check)" } },
+    });
+  } else if (after !== ev.confidence) await update("events", `id=eq.${ev.id}`, { confidence: after });
   if (ctx.scoutRequestId) {
     const [req] = await select<ScoutRequest>("scout_requests", `select=id,segment_id,question,demand_count,sent_to,fulfilled_by_report_id,created_at,is_demo&id=eq.${ctx.scoutRequestId}`);
     if (req) await dispatchRequest(req).catch((err: Error) => console.warn("[investigate] scout dispatch failed:", err.message));

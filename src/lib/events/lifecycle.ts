@@ -21,8 +21,11 @@ export interface Taps {
   factor?: number;
   /** Last "No, it's gone". */
   noAt?: string;
-  /** No votes since the last full Yes: device, time, weight (No = 1, Almost clear = 0.5). */
+  /** No votes since the last full Yes: device, time, weight (No = 1, Almost clear = 0.5, a Drive Watch pass 0.5–1). */
   nos?: { d: string; at: string; w: number }[];
+  /** Other doubt after the last confirmation (Part C): the Investigator cited news that it reopened. */
+  doubtAt?: string;
+  doubtReason?: string;
 }
 
 export interface LifecycleInput {
@@ -99,6 +102,11 @@ export function lifecycleOf(e: LifecycleInput, now = Date.now()): Lifecycle {
   if (noAt && noAt > last + 60_000 && noAt < unconfirmed) {
     unconfirmed = noAt;
     reason = "A traveller passing by said it's gone";
+  }
+  const doubtAt = t?.doubtAt ? new Date(t.doubtAt).getTime() : null;
+  if (doubtAt && doubtAt > last + 60_000 && doubtAt < unconfirmed) {
+    unconfirmed = doubtAt;
+    reason = t?.doubtReason ?? "New evidence suggests it may have cleared";
   }
   const sinceH = (now - last) / 3_600_000;
   const state: LifecycleState = now >= expires ? "expired" : now >= unconfirmed ? "unconfirmed" : "active";

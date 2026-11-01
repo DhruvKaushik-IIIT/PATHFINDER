@@ -1,6 +1,6 @@
 // pnpm test:lifecycle — shelf life rules (docs/event-lifecycle.md). No AI, no network.
 import { lifecycleOf, shelfLifeH } from "../src/lib/events/lifecycle.ts";
-import { applyTap, noWeight } from "../src/lib/events/stillThere.ts";
+import { applyTap, noWeight, passWeight } from "../src/lib/events/stillThere.ts";
 
 let fail = 0;
 const check = (name: string, ok: boolean, info = "") => {
@@ -80,6 +80,20 @@ const almost = applyTap(no2.taps, 0.6, "almost_clear", "dev3", NOW - 60_000);
 check("almost clear = ½ No, earlier Nos kept (2.5)", noWeight(almost.taps.nos, NOW).weight === 2.5);
 const oldNos = applyTap({ nos: [{ d: "a", at: iso(7), w: 1 }, { d: "b", at: iso(7), w: 1 }] }, 0.6, "gone", "c", NOW);
 check("Nos older than 6 h don't count", noWeight(oldNos.taps.nos, NOW).weight === 1);
+
+// Passing traffic (Part C)
+check("closed road, drove through at 25 km/h → full 'gone'", passWeight("landslide", "closed", 25) === 1);
+check("closed road, crawling at 5 km/h → no signal", passWeight("landslide", "closed", 5) === 0);
+check("traffic jam, 45 km/h → full 'gone'", passWeight("traffic", "slow", 45) === 1);
+check("traffic jam, 15 km/h → no signal (still jammed)", passWeight("traffic", "slow", 15) === 0);
+check("one-lane landslide, 40 km/h → half", passWeight("landslide", "one_lane", 40) === 0.5);
+check("one-lane landslide, 20 km/h → no signal (one lane moves too)", passWeight("landslide", "one_lane", 20) === 0);
+
+// Investigator news (Part C)
+const doubt = lifecycleOf({ ...base, lastConfirmedAt: iso(3), taps: { doubtAt: iso(1), doubtReason: "Recent news says the road has reopened (AI check)" } }, NOW);
+check("news says reopened → Unconfirmed at once, with that reason", doubt.state === "unconfirmed" && /news/.test(doubt.reason ?? ""), doubt.reason ?? "");
+const doubtOld = lifecycleOf({ ...base, lastConfirmedAt: iso(1), taps: { doubtAt: iso(3) } }, NOW);
+check("a newer photo after the news wins (active again)", doubtOld.state === "active");
 
 console.log(fail ? `\n${fail} failed` : "\nall passed");
 process.exit(fail ? 1 : 0);
