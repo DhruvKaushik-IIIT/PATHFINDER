@@ -177,6 +177,18 @@ export const CrewBrief = z.object({
 });
 export type CrewBrief = z.infer<typeof CrewBrief>;
 
+/** Count of Devanagari letters: "Hindi" written in Latin script has none (B3). */
+export const devanagariCount = (s: string | null | undefined) => (s?.match(/[ऀ-ॿ]/g) ?? []).length;
+
+/** One sentence translated into Hindi (B3 repair job): must really be Devanagari. */
+export const HindiText = z.object({
+  hi: z
+    .string()
+    .refine((s) => devanagariCount(s) >= 5, "must be Hindi in Devanagari script")
+    .describe("the sentence in simple Hindi, Devanagari script"),
+});
+export type HindiText = z.infer<typeof HindiText>;
+
 /** A site worker's voice note, translated for the public "Note from the site" card (Nov 1). */
 export const SiteNote = z.object({
   lang: z.enum(["hi", "en", "mixed", "other"]),

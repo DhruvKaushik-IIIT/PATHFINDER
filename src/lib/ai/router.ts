@@ -17,6 +17,7 @@ import { NEWS_PARSE_SYSTEM, newsParseUserText, newsSearchPrompt } from "./prompt
 import { ADVISORY_SYSTEM, advisoryUserText } from "./prompts/advisory.ts";
 import { CREW_SYSTEM, crewUserText } from "./prompts/crew.ts";
 import { SITE_NOTE_SYSTEM, siteNoteUserText } from "./prompts/siteNote.ts";
+import { HINDI_SYSTEM, hindiUserText } from "./prompts/hindi.ts";
 import { DISPATCH_SYSTEM, dispatchUserText } from "./prompts/dispatch.ts";
 import { INVESTIGATE_SYSTEM, investigateUserText } from "./prompts/investigate.ts";
 import { SLOPE_CHECK_SYSTEM, SLOPE_SYSTEM, slopeCheckUserText, slopeUserText } from "./prompts/slope.ts";
@@ -25,7 +26,7 @@ import { runSlopeTool, SLOPE_TOOLS, type SlopeToolContext } from "./tools/slope.
 import { SlopeCheck, SlopeReading, SlopeRisk, FitAssessment, FitCheck, VehicleId } from "./schemas.ts";
 import { VEHICLE_SYSTEM, vehicleUserText } from "./prompts/vehicle.ts";
 import { FIT_CHECK_SYSTEM, FIT_SYSTEM, fitCheckUserText, fitUserText } from "./prompts/fit.ts";
-import { Advisory, ClaimSet, CrewBrief, SiteNote, DispatchProposal, Investigation, jsonSchemaFormat, NearbySummary, NewsItems, parseJson, RouteVerdict, Verdict, type Claim } from "./schemas.ts";
+import { Advisory, ClaimSet, CrewBrief, devanagariCount, HindiText, SiteNote, DispatchProposal, Investigation, jsonSchemaFormat, NearbySummary, NewsItems, parseJson, RouteVerdict, Verdict, type Claim } from "./schemas.ts";
 import { DISPATCH_TOOLS, runDispatchTool, type DispatchContext } from "./tools/dispatch.ts";
 import { INVESTIGATE_TOOLS, runInvestigateTool, type InvestigateContext } from "./tools/investigate.ts";
 import { ist, ROUTE_CHECK_TOOLS, runRouteCheckTool, type RouteCheckContext } from "./tools/routeCheck.ts";
@@ -422,6 +423,38 @@ export function writeClaim(input: ClaimInput): Promise<JobResult<ClaimSet | null
     mock: () => fixture("claims", ClaimSet),
     lastResort: () => null,
   });
+}
+
+/** One English sentence → simple Hindi in Devanagari (Meta Spark → Baseten; null = no Hindi). */
+export function translateToHindi(en: string): Promise<JobResult<string | null>> {
+  const content: ChatContent = [{ type: "text", text: hindiUserText(en) }];
+  const attempt = (provider: Provider, model: string): Attempt<string | null> => ({
+    provider,
+    model,
+    run: async (c) => {
+      const { data, usage } = await chatJson(c, provider, model, { name: "hindi", schema: HindiText, system: HINDI_SYSTEM, content });
+      return { data: data.hi, usage };
+    },
+  });
+  return runJob<string | null>({
+    purpose: "translate_hindi",
+    // Meta first: the claim writer that slipped into Latin script is usually Baseten.
+    attempts: [attempt("meta", MODELS.spark), attempt("baseten", MODELS.sparkOpen)],
+    mock: () => null,
+    lastResort: () => null,
+  });
+}
+
+/**
+ * B3: models sometimes write "Hindi" in Latin script ("Bhusklhan se sadak…"). Keep real Devanagari as is;
+ * otherwise translate the English sentence once; if that fails too, return "" so the UI hides the Hindi line
+ * rather than showing something wrong. Never throws.
+ */
+export async function ensureHindi(en: string, hi: string | null | undefined): Promise<string> {
+  if (devanagariCount(hi) >= 5) return hi!;
+  if (!en.trim()) return "";
+  const r = await translateToHindi(en).catch(() => null);
+  return r?.data ?? "";
 }
 
 export interface VerifyOutcome {

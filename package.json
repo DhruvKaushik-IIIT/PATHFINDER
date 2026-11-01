@@ -49,7 +49,8 @@
     "scan-secrets": "bash scripts/scan-secrets.sh",
     "test:guard": "node --env-file-if-exists=.env.local scripts/test-guard.ts",
     "test:crew-needs": "node scripts/test-crew-needs.ts",
-    "seed-crews": "node --env-file-if-exists=.env.local scripts/seed-crews.ts"
+    "seed-crews": "node --env-file-if-exists=.env.local scripts/seed-crews.ts",
+    "test:hindi": "node --env-file-if-exists=.env.local scripts/test-hindi.ts"
   },
   "dependencies": {
     "@meta-sam/parser": "^0.1.0",
