@@ -19,7 +19,7 @@ export async function POST(req: Request) {
   try {
     const r = await signIn(body.data.deptId, body.data.password);
     if (!r.ok) return NextResponse.json({ ok: false, error: r.reason }, { status: 401 });
-    return NextResponse.json({ ok: true, data: { name: r.official.name, org: r.official.org, district: r.official.district.name } });
+    return NextResponse.json({ ok: true, data: { name: r.official.name, org: r.official.org, district: r.official.district.name, role: r.official.role } });
   } catch (err) {
     console.error("[official] sign-in failed:", (err as Error).message);
     return NextResponse.json({ ok: false, error: "Sign-in is unavailable right now. Try again in a minute." }, { status: 503 });

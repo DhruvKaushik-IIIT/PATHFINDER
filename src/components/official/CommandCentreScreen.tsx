@@ -12,7 +12,7 @@ import type { MapRef } from "react-map-gl/maplibre";
 import Sheet from "@/components/glass/Sheet";
 import Toast from "@/components/glass/Toast";
 import RiskLayer from "@/components/map/RiskLayer";
-import DispatchCard from "./DispatchCard";
+import CrewPlanCard from "./CrewPlanCard";
 import SlopesToInspect from "./SlopesToInspect";
 import { eventTitle, STATUS_STYLE } from "@/lib/events/types";
 import { hoursText, roughCount, type CommandCentre, type QueueItem } from "@/lib/official/types";
@@ -56,8 +56,10 @@ export default function CommandCentreScreen() {
     const q = new URLSearchParams(window.location.search);
     const sent = q.get("published");
     const updated = q.get("updated");
-    if (sent === null && updated === null) return;
-    if (sent !== null) setToast(`Advisory published — sent to ${sent} traveller${sent === "1" ? "" : "s"} watching this road.`);
+    const crew = q.get("crew");
+    if (sent === null && updated === null && crew === null) return;
+    if (crew !== null) setToast(`${crew} sent — ${q.get("alerted") ?? "every"} workers got the job on their phone. Follow them under Crews.`);
+    else if (sent !== null) setToast(`Advisory published — sent to ${sent} traveller${sent === "1" ? "" : "s"} watching this road.`);
     else if (updated === "open") setToast("Marked fully open — the event is closed and the crew is free again. Road Watch is re-checking trips.");
     else if (updated === "warn") setToast("Update posted, but the photo didn't match — it's flagged on the timeline. Road Watch is re-checking trips.");
     else setToast("Update posted — travellers on this road will see it. Road Watch is re-checking trips.");
@@ -71,6 +73,11 @@ export default function CommandCentreScreen() {
         const res = await fetch("/api/official/queue");
         if (res.status === 401) {
           router.replace("/official/login");
+          return;
+        }
+        if (res.status === 403) {
+          // Crew accounts have their own "My job" screen (Option B).
+          router.replace("/crew");
           return;
         }
         const j = (await res.json()) as { ok: boolean; data?: CommandCentre; degraded?: string; error?: string };
@@ -97,7 +104,6 @@ export default function CommandCentreScreen() {
     };
   }, [router, version]);
 
-  const onApproved = useCallback(() => setVersion((v) => v + 1), []);
 
   async function signOut() {
     await fetch("/api/official/logout", { method: "POST" }).catch(() => {});
@@ -159,7 +165,7 @@ export default function CommandCentreScreen() {
         </header>
         <div className="pointer-events-auto flex gap-2" aria-label="District at a glance">
           <StatTile value={s ? String(s.active) : "–"} label="active" />
-          <StatTile value={s ? `${s.crewsFree}/${s.crewsTotal}` : "–"} label="crews free" />
+          <StatTile value={s ? `${s.crewsFree}/${s.crewsTotal}` : "–"} label="workers free" />
           <StatTile value={s ? `~${roughCount(s.vehiclesHit)}` : "–"} label="vehicles hit" />
           <StatTile value={s ? String(s.watching) : "–"} label="watching" />
         </div>
@@ -224,7 +230,7 @@ export default function CommandCentreScreen() {
           )}
 
           {cc && cc.queue.length > 0 && (
-            <DispatchCard version={version} advisoryEventId={cc.queue[0]!.event.id} onApproved={onApproved} onMessage={setToast} />
+            <CrewPlanCard version={version} advisoryEventId={cc.queue[0]!.event.id} onMessage={setToast} />
           )}
 
           {cc && <SlopesToInspect onMessage={setToast} />}

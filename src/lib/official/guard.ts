@@ -14,3 +14,19 @@ export async function requireOfficial(): Promise<Official | NextResponse> {
     return NextResponse.json({ ok: false, error: "Sign-in service unavailable" }, { status: 503 });
   }
 }
+
+/** Office-only routes (dispatch, queue, advisories, slope inspections): crew accounts get 403. */
+export async function requireOffice(): Promise<Official | NextResponse> {
+  const who = await requireOfficial();
+  if (who instanceof NextResponse) return who;
+  if (who.role === "crew") return NextResponse.json({ ok: false, error: "Crew accounts see their own job only." }, { status: 403 });
+  return who;
+}
+
+/** Crew-only routes (/api/crew/*): the signed-in crew member with their worker row. */
+export async function requireCrew(): Promise<(Official & { worker: NonNullable<Official["worker"]> }) | NextResponse> {
+  const who = await requireOfficial();
+  if (who instanceof NextResponse) return who;
+  if (who.role !== "crew" || !who.worker) return NextResponse.json({ ok: false, error: "Crew accounts only." }, { status: 403 });
+  return who as Official & { worker: NonNullable<Official["worker"]> };
+}

@@ -8,16 +8,18 @@
 //   (or set OFFICIAL_PASSWORD instead of --password so it stays out of shell history)
 import { hasDb, supabaseUrl } from "../src/lib/db/supabase.ts";
 import { DISTRICTS } from "../src/lib/official/districts.ts";
-import { DEMO_OFFICIAL, deptEmail } from "../src/lib/official/dept.ts";
+import { DEMO_CREW, DEMO_OFFICIAL, deptEmail } from "../src/lib/official/dept.ts";
 
-const DEMO = DEMO_OFFICIAL;
+// --crew-demo → the judges' crew login (DEMO_CREW), attached to that worker's seeded users row (pnpm seed-crews).
+const crewDemo = process.argv.includes("--crew-demo");
+const DEMO = crewDemo ? DEMO_CREW : DEMO_OFFICIAL;
 
 const arg = (k: string) => process.argv.find((a) => a.startsWith(`--${k}=`))?.slice(k.length + 3);
 const dept = arg("dept") ?? DEMO.dept;
 const isDemo = dept === DEMO.dept;
 const name = arg("name") ?? (isDemo ? DEMO.name : dept);
 const district = arg("district") ?? DEMO.district;
-const role = arg("role") ?? "official";
+const role = arg("role") ?? DEMO.role;
 const password = arg("password") ?? process.env.OFFICIAL_PASSWORD ?? (isDemo ? DEMO.password : undefined);
 
 if (!hasDb()) throw new Error("Supabase env vars missing (NEXT_PUBLIC_SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY)");
@@ -64,6 +66,14 @@ if (created.status < 300 && created.json.id) {
 }
 
 // 2. Our users row with the role (the actual access gate).
+if (crewDemo) {
+  // Attach the login to the worker's existing users row (it is what workers.user_id points at).
+  await call("PATCH", `${supabaseUrl()}/rest/v1/users?auth_user_id=eq.${authId}&id=neq.${DEMO_CREW.userId}`, { auth_user_id: null });
+  const r = await call<{ id: string }[]>("PATCH", `${supabaseUrl()}/rest/v1/users?id=eq.${DEMO_CREW.userId}`, { auth_user_id: authId, role: "crew" }, { Prefer: "return=representation" });
+  if (r.status >= 300 || !r.json.length) throw new Error("The demo worker's users row is missing — run `pnpm seed-crews` first");
+  console.log(`✓ ${DEMO_CREW.name} · crew · ${DEMO_CREW.district} — sign in at /official/login with Department ID ${DEMO_CREW.dept} (password ${DEMO_CREW.password})`);
+  process.exit(0);
+}
 const row = await call<{ id: string }[]>(
   "POST",
   `${supabaseUrl()}/rest/v1/users?on_conflict=auth_user_id`,
