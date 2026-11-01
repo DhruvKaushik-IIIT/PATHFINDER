@@ -229,12 +229,29 @@ export default function RouteScreen() {
   const impact = new Map(v?.disruptions.map((d) => [d.eventId, d.impact]));
   const others = v?.options.filter((o) => !o.recommended).slice(0, 2) ?? [];
   const outside = best?.legs.filter((l) => !l.insideHp && l.distanceKm >= 1) ?? [];
+  // Closures Pathfinder routed AROUND (Nov 1): on another road option but not on the chosen one. Without
+  // this the closure that made us pick this road never shows up (Kataula on Mandi → Manali).
+  const avoided = (() => {
+    if (!plan || !best) return [];
+    const onBest = new Set(best.events.map((e) => e.id));
+    const out: { e: (typeof best.events)[number]; road: string | null; savedMin: number | null }[] = [];
+    for (const r of plan.routes.slice(1)) {
+      for (const e of r.events) {
+        if (!e.blocks || onBest.has(e.id) || out.some((x) => x.e.id === e.id)) continue;
+        // The event's own road ("MDR23" → "MDR-23"), else the first road this option uses that ours doesn't.
+        const own = e.roadRef ? e.roadRef.replace(/^([A-Z]+)\s*-?\s*(\d)/, "$1-$2") : null;
+        const road = own ?? r.viaRoads.find((x) => !best.viaRoads.includes(x)) ?? null;
+        out.push({ e, road, savedMin: r.totalMin < best.totalMin ? best.totalMin - r.totalMin : null });
+      }
+    }
+    return out;
+  })();
 
   return (
     <main className="fixed inset-0 overflow-hidden">
       <MapView
         mapRef={mapRef}
-        events={best?.events ?? []}
+        events={[...(best?.events ?? []), ...avoided.map((a) => a.e)]}
         onSelectEvent={(e) => router.push(`/event/${e.id}`)}
         onViewChange={fit}
         routes={plan?.routes.map((r) => r.geometry) ?? []}
@@ -347,6 +364,35 @@ export default function RouteScreen() {
             ) : (
               <div className="glass-card px-[14px] py-3 text-[14px] text-ink-2">
                 No verified issues on this route · checked {clock(plan!.checkedAt)}
+              </div>
+            )}
+
+            {avoided.length > 0 && (
+              <div className="glass-card flex flex-col" aria-label="Avoided on this trip">
+                <span className="px-[14px] pt-3 text-[12px] font-bold uppercase tracking-[0.4px] text-ink-2">Avoided on this trip</span>
+                {avoided.map(({ e, road, savedMin }, i) => {
+                  const st = STATUS_STYLE[e.status] ?? STATUS_STYLE.unknown;
+                  return (
+                    <Link
+                      key={e.id}
+                      href={`/event/${e.id}`}
+                      className={`flex items-center gap-3 px-[14px] py-3 text-ink no-underline ${i < avoided.length - 1 ? "border-b-[0.5px] border-[rgba(60,60,67,0.18)]" : ""}`}
+                    >
+                      <span className="size-3 shrink-0 rounded-full" style={{ background: st.dot }} aria-hidden />
+                      <span className="flex min-w-0 flex-1 flex-col gap-px">
+                        <span className="truncate text-[15px] font-semibold">
+                          {eventTitle(e.type, e.placeName)} <span className="sr-only">({st.word})</span>
+                        </span>
+                        <span className="line-clamp-2 text-[13px] text-ink-2">
+                          {st.word}
+                          {road ? ` on ${road}` : ""} · you go {best.viaRoads.length ? `via ${best.viaRoads.join(" / ")}` : "another way"} instead
+                          {savedMin ? ` (~${duration(savedMin)} longer)` : ""}
+                        </span>
+                      </span>
+                      <ChevronRight size={15} strokeWidth={2.6} className="shrink-0 text-unknown" aria-hidden />
+                    </Link>
+                  );
+                })}
               </div>
             )}
 
