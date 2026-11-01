@@ -16,7 +16,8 @@ function score(e: MapEvent, km: number, now: number): number {
   const ageH = Math.max(0, (now - new Date(e.lastConfirmedAt).getTime()) / 3_600_000);
   const proximity = 1 / (1 + km / 10); // 10 km away counts half as much as right here
   const freshness = Math.exp(-ageH / 24); // a day-old confirmation counts ~⅓
-  return SEVERITY[e.status] * (0.4 + 0.6 * e.confidence) * proximity * (0.3 + 0.7 * freshness);
+  const unconfirmed = e.lifecycle?.state === "unconfirmed" ? 0.3 : 1; // shelf life: past half → ranked low
+  return SEVERITY[e.status] * (0.4 + 0.6 * e.confidence) * proximity * (0.3 + 0.7 * freshness) * unconfirmed;
 }
 
 const title = (e: MapEvent) => eventTitle(e.type, e.placeName);
@@ -111,6 +112,7 @@ export async function nearby(
           ago: ago(e.lastConfirmedAt, now),
           clears: e.etaClear ? `${ist(new Date(e.etaClear.earliest))}–${ist(new Date(e.etaClear.latest))}` : null,
           confidence: e.confidence,
+          ...(e.lifecycle?.state === "unconfirmed" && { unconfirmed: "no recent reports — may already be cleared" }),
         })),
       },
       template,

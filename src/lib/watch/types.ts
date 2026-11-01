@@ -62,6 +62,13 @@ export interface Alert {
     requestId?: string;
     question?: string;
     km?: number;
+    /** "Still there?" ask (docs/event-lifecycle.md §2): the event to answer about. */
+    stillThere?: boolean;
+    type?: string;
+    status?: string;
+    placeName?: string | null;
+    lat?: number;
+    lng?: number;
   } | null;
   read: boolean;
   createdAt: string;

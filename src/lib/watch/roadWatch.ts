@@ -47,7 +47,10 @@ export function snapshot(plan: RoutePlan): WatchSnapshot {
   const lats = coords.map((c) => c[1]!);
   const seen = new Map<string, WatchSnapshot["events"][number]>();
   for (const e of plan.routes.flatMap((r) => r.events)) {
-    if ((e.delayMin > 0 || e.blocks) && !seen.has(e.id)) seen.set(e.id, { id: e.id, status: e.status, title: eventTitle(e.type, e.placeName) });
+    // Unconfirmed events (shelf life) stay in the snapshot: going grey is not news. Only expiry
+    // (the event disappears) or a new confirmation with another status alerts the traveller.
+    const unconfirmedIssue = e.lifecycle?.state === "unconfirmed" && e.status !== "open" && e.type !== "clear";
+    if ((e.delayMin > 0 || e.blocks || unconfirmedIssue) && !seen.has(e.id)) seen.set(e.id, { id: e.id, status: e.status, title: eventTitle(e.type, e.placeName) });
   }
   return {
     events: [...seen.values()],

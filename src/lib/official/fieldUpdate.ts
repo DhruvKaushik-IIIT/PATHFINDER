@@ -2,6 +2,7 @@
 // SAM measures it (and blurs faces/plates) → code compares with the event's first photo and with what
 // the official entered (progress.ts) → photo + official_updates row + event status/ETA/timeline →
 // Road Watch for travellers on that road. Mismatches are flagged on the timeline, not hidden.
+import { mutateEvent } from "../events/mutate.ts";
 import { transcribe, translateSiteNote } from "../ai/router.ts";
 import { SKILL_WORD, type Skill } from "../crew/needs.ts";
 import { debrisVolumeM3 } from "../clearing/estimate.ts";
@@ -206,7 +207,8 @@ export async function postFieldUpdate(official: Official, input: FieldInput): Pr
   const stateEn = { closed: "closed while crews clear it", one_lane: "one lane open", open: "fully open again" }[newStatus];
   const stateHi = { closed: "सफ़ाई के दौरान बंद", one_lane: "एक लेन खुली", open: "पूरी तरह खुल गया" }[newStatus];
   const measured = samOk ? Object.fromEntries(Object.entries(p.measurements).filter(([k]) => ["blockedPct", "roadWidthLeftM", "roadTotalWidthM", "blockedLengthM"].includes(k))) : {};
-  await update("events", `id=eq.${ev.id}`, {
+  // Counts/confidence from the fresh row (optimistic locking, migration 0005).
+  await mutateEvent<{ confidence: number; sources: Record<string, number> | null }>(ev.id, "confidence,sources", (row) => ({
     status: newStatus,
     passable,
     eta_clear: eta ? { earliest: new Date(Math.max(now.getTime(), eta.getTime() - 90 * 60_000)).toISOString(), latest: eta.toISOString() } : null,
@@ -216,11 +218,11 @@ export async function postFieldUpdate(official: Official, input: FieldInput): Pr
     })(),
     summary: `${title}: ${stateEn}${resolved ? "" : `, ${input.pctCleared}% cleared`}${etaText ? `, ${etaText}` : ""} (${official.org} update).`,
     summary_hi: `${title}: ${stateHi}${resolved ? "" : `, ${input.pctCleared}% साफ़`}${eta ? `, ~${clock(eta.toISOString())} तक पूरी तरह खुलने की उम्मीद` : ""} (${official.org})।`,
-    confidence: check.level === "ok" ? Math.max(ev.confidence, 0.9) : ev.confidence,
+    confidence: check.level === "ok" ? Math.max(row.confidence, 0.9) : row.confidence,
     last_confirmed_at: now.toISOString(),
-    sources: { ...sources, official: sources.official + 1 },
+    sources: { ...sources, ...row.sources, official: (row.sources?.official ?? sources.official) + 1 },
     ...(resolved && { resolved_at: now.toISOString() }),
-  });
+  }));
   if (resolved && crew) {
     await update("crews", `id=eq.${crew.id}`, { current_event_id: null, available: true, status: "done", done_at: now.toISOString() });
     await releaseCrew(crew.id, ev); // assembled crews go back to the pool (Option B)

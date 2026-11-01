@@ -4,10 +4,12 @@
 // for status (roads change by the hour); confidence grows with independent confirmations.
 import type { Claim, Verdict } from "../ai/schemas.ts";
 import { debrisVolumeM3, type Range } from "../clearing/estimate.ts";
-import { insert, select, update } from "../db/supabase.ts";
+import { insert, select } from "../db/supabase.ts";
 import type { VerificationRecord } from "../verification/types.ts";
+import { lifecycleOf, type Taps } from "../events/lifecycle.ts";
+import { closeExpired } from "../events/expire.ts";
+import { bumpReports, mutateEvent } from "../events/mutate.ts";
 
-const MERGE_WINDOW_H = 24;
 const NEAR_DEG = 0.003; // ~300 m box when the report could not be snapped to a segment
 // Time-consistency (Phase 5 stretch): an old photo can't say what the road is like NOW, and a
 // contradicting report minutes after a confirmation doesn't flip the status unless it is more certain.
@@ -24,6 +26,9 @@ export interface EventRow {
   sources: { reports: number; official: number; news: number; notices: number };
   models_agreed: number | null;
   last_confirmed_at: string;
+  eta_clear?: { earliest: string; latest: string } | null;
+  measurements?: { potholeSize?: string | null } | null;
+  is_demo?: boolean | null;
 }
 
 export interface EventUpdate {
@@ -55,17 +60,28 @@ export interface EventResult {
   timeCheck?: string;
 }
 
+/** The open event at this spot that is still within its shelf life (docs/event-lifecycle.md).
+ *  One past its shelf life is closed first, so the new report starts a fresh event. */
 async function findOpenEvent(u: EventUpdate): Promise<EventRow | null> {
-  const since = new Date(Date.now() - MERGE_WINDOW_H * 3_600_000).toISOString();
-  const cols = "id,segment_id,type,status,confidence,sources,models_agreed,last_confirmed_at";
+  const cols = "id,segment_id,type,status,confidence,sources,models_agreed,last_confirmed_at,eta_clear,measurements,is_demo";
   const where = u.segmentId
     ? `segment_id=eq.${encodeURIComponent(u.segmentId)}`
     : `lat=gte.${u.lat - NEAR_DEG}&lat=lte.${u.lat + NEAR_DEG}&lng=gte.${u.lng - NEAR_DEG}&lng=lte.${u.lng + NEAR_DEG}`;
   const [row] = await select<EventRow>(
     "events",
-    `select=${cols}&${where}&resolved_at=is.null&last_confirmed_at=gte.${since}&order=last_confirmed_at.desc&limit=1`,
+    `select=${cols}&${where}&resolved_at=is.null&order=last_confirmed_at.desc&limit=1`,
   );
-  return row ?? null;
+  if (!row) return null;
+  const life = lifecycleOf({
+    type: row.type, status: row.status, lastConfirmedAt: row.last_confirmed_at, reports: row.sources?.reports,
+    official: row.sources?.official, news: row.sources?.news, etaClear: row.eta_clear, potholeSize: row.measurements?.potholeSize,
+    isDemo: row.is_demo, taps: (row.sources as { taps?: Taps } | null)?.taps,
+  });
+  if (life.state === "expired") {
+    await closeExpired([{ id: row.id, reason: life.reason }]).catch(() => {});
+    return null;
+  }
+  return row;
 }
 
 /** Combined confidence of one verified report: both models' views, a bonus when they agree. */
@@ -88,9 +104,18 @@ export async function applyToWorldState(u: EventUpdate): Promise<EventResult> {
   if (verdict.verdict === "reject") return { eventId: null, action: "none", reportStatus: "rejected", eventReports: 0 };
 
   const type = verdict.correctedEventType ?? claim.eventType;
-  const status = verdict.correctedStatus ?? claim.status;
+  // Potholes are common in India: size decides (docs/event-lifecycle.md). Minor = a rough road, not a disruption.
+  const potholeSize = type === "pothole" ? (verdict.correctedPotholeSize ?? claim.potholeSize ?? null) : null;
+  const status =
+    potholeSize === "minor" ? "open" : potholeSize === "medium" ? "slow" : potholeSize === "severe" ? "one_lane" : (verdict.correctedStatus ?? claim.status);
   const accepted = verdict.verdict === "accept";
   const existing = await findOpenEvent(u);
+  if (potholeSize === "minor" && !existing) {
+    return {
+      eventId: null, action: "none", reportStatus: accepted ? "accepted" : "pending", eventReports: 0,
+      timeCheck: "Minor potholes: saved as a rough-road note, not shown as a disruption",
+    };
+  }
   const now = new Date().toISOString();
   const conf = reportConfidence(u);
   // Claim numbers win (the model saw the photo + SAM); SAM fills what the claim leaves out.
@@ -102,7 +127,7 @@ export async function applyToWorldState(u: EventUpdate): Promise<EventResult> {
     blockedPct: cm.blockedPct ?? sam.blockedPct ?? null,
     roadTotalWidthM: sam.roadTotalWidthM ?? null,
   };
-  const measurements = { ...measured, debrisVolumeM3: debrisVolumeM3(type, measured) };
+  const measurements = { ...measured, debrisVolumeM3: debrisVolumeM3(type, measured), ...(potholeSize && { potholeSize }) };
 
   const timeline = (eventId: string, text: string) =>
     insert("event_timeline", {
@@ -122,10 +147,9 @@ export async function applyToWorldState(u: EventUpdate): Promise<EventResult> {
   if (u.photoAgeH != null && u.photoAgeH > OLD_PHOTO_H) {
     const note = `Photo taken ${ago(u.photoAgeH)} ago — kept as history, not as the road's current state`;
     if (!existing) return { eventId: null, action: "none", reportStatus: "pending", eventReports: 0, timeCheck: note };
-    const sources = { ...existing.sources, reports: (existing.sources?.reports ?? 0) + 1 };
-    await update("events", `id=eq.${existing.id}`, { sources });
+    const reports = await bumpReports(existing.id);
     await timeline(existing.id, `Older photo (taken ${ago(u.photoAgeH)} ago): ${claim.summary}`);
-    return { eventId: existing.id, action: "noted", reportStatus: "pending", eventReports: sources.reports, timeCheck: note };
+    return { eventId: existing.id, action: "noted", reportStatus: "pending", eventReports: reports, timeCheck: note };
   }
 
   if (!existing) {
@@ -152,12 +176,11 @@ export async function applyToWorldState(u: EventUpdate): Promise<EventResult> {
     return { eventId: ev!.id, action: "created", reportStatus: "accepted", eventReports: 1 };
   }
 
-  const sources = { ...existing.sources, reports: (existing.sources?.reports ?? 0) + 1 };
   if (!accepted) {
     // Ambiguous evidence: keep it on the record, don't move the status.
-    await update("events", `id=eq.${existing.id}`, { sources });
+    const reports = await bumpReports(existing.id);
     await timeline(existing.id, `Unconfirmed report: ${claim.summary}`);
-    return { eventId: existing.id, action: "noted", reportStatus: "pending", eventReports: sources.reports };
+    return { eventId: existing.id, action: "noted", reportStatus: "pending", eventReports: reports };
   }
 
   // Flip-flop guard: the same spot confirmed as something else minutes ago, and this report is less
@@ -166,25 +189,30 @@ export async function applyToWorldState(u: EventUpdate): Promise<EventResult> {
   const minsSince = (Date.now() - new Date(existing.last_confirmed_at).getTime()) / 60_000;
   if (newStatus !== existing.status && minsSince < FLIP_WINDOW_MIN && conf < existing.confidence) {
     const note = `Conflicts with "${existing.status.replace("_", " ")}" confirmed ${Math.max(1, Math.round(minsSince))} min ago — status kept until another report or the Investigator settles it`;
-    await update("events", `id=eq.${existing.id}`, { sources });
+    const reports = await bumpReports(existing.id);
     await timeline(existing.id, `Conflicting report (says ${newStatus.replace("_", " ")}): ${claim.summary} · status kept`);
-    return { eventId: existing.id, action: "noted", reportStatus: "pending", eventReports: sources.reports, timeCheck: note };
+    return { eventId: existing.id, action: "noted", reportStatus: "pending", eventReports: reports, timeCheck: note };
   }
 
   const clears = type === "clear" || status === "open";
-  await update("events", `id=eq.${existing.id}`, {
-    // A "clear" report reopens the road but keeps the event's original type for its history.
-    ...(clears ? { status: "open", resolved_at: now } : { type, status }),
-    passable: claim.passable,
-    measurements,
-    summary: claim.summary,
-    summary_hi: claim.summaryHi,
-    // Independent confirmations compound: 1 − Π(1 − cᵢ), damped so one report can't max it out.
-    confidence: Math.min(0.97, 1 - (1 - existing.confidence) * (1 - conf * 0.6)),
-    last_confirmed_at: now,
-    sources,
-    models_agreed: Math.max(existing.models_agreed ?? 0, u.modelsAgreed),
+  // Counts and confidence come from the FRESH row (optimistic locking): parallel reports/votes all count.
+  let reports = (existing.sources?.reports ?? 0) + 1;
+  await mutateEvent<EventRow>(existing.id, "sources,confidence,models_agreed", (row) => {
+    reports = (row.sources?.reports ?? 0) + 1;
+    return {
+      // A "clear" report reopens the road but keeps the event's original type for its history.
+      ...(clears ? { status: "open", resolved_at: now } : { type, status }),
+      passable: claim.passable,
+      measurements,
+      summary: claim.summary,
+      summary_hi: claim.summaryHi,
+      // Independent confirmations compound: 1 − Π(1 − cᵢ), damped so one report can't max it out.
+      confidence: Math.min(0.97, 1 - (1 - row.confidence) * (1 - conf * 0.6)),
+      last_confirmed_at: now,
+      sources: { ...row.sources, reports },
+      models_agreed: Math.max(row.models_agreed ?? 0, u.modelsAgreed),
+    };
   });
   await timeline(existing.id, clears ? `Road reported clear again: ${claim.summary}` : `Confirmed: ${claim.summary}`);
-  return { eventId: existing.id, action: "merged", reportStatus: "accepted", eventReports: sources.reports };
+  return { eventId: existing.id, action: "merged", reportStatus: "accepted", eventReports: reports };
 }

@@ -13,7 +13,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Layer, Source, type MapRef } from "react-map-gl/maplibre";
 import Sheet from "@/components/glass/Sheet";
 import Toast from "@/components/glass/Toast";
-import { ago, STATUS_STYLE, TYPE_WORD, type NearbyResult } from "@/lib/events/types";
+import { ago, isUnconfirmed, STATUS_STYLE, styleOf, TYPE_WORD, type NearbyResult } from "@/lib/events/types";
 import RiskLayer from "@/components/map/RiskLayer";
 import SlopeLayer from "@/components/map/SlopeLayer";
 import { fetchSlopes } from "@/components/map/useSlopes";
@@ -372,7 +372,7 @@ export default function NearbyScreen() {
             {data.items.length > 0 ? (
               <ul className="m-0 list-none rounded-[16px] bg-white/[0.82] p-0">
                 {data.items.map((e, i) => {
-                  const st = STATUS_STYLE[e.status];
+                  const st = styleOf(e); // grey "Unconfirmed" past half its shelf life
                   return (
                     <li key={e.id}>
                       <Link
@@ -391,6 +391,7 @@ export default function NearbyScreen() {
                             {e.roadRef ? ` · ${e.roadRef}` : ""} · {e.distanceKm < 1 ? "<1" : Math.round(e.distanceKm)} km ·{" "}
                             {ago(e.lastConfirmedAt)}
                             {!e.reports && e.news ? " · news" : ""}
+                            {isUnconfirmed(e) ? ` · was ${STATUS_STYLE[e.status].word.toLowerCase()}` : ""}
                           </span>
                         </span>
                         <ChevronRight size={14} strokeWidth={2.6} className="shrink-0 text-unknown" aria-hidden />

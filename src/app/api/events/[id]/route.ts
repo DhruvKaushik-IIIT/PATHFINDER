@@ -9,6 +9,7 @@ import type { InvestigatedEvent } from "@/lib/ai/tools/investigate.ts";
 import { lastInvestigation, whyInvestigate } from "@/lib/investigate/investigator.ts";
 import { eventVerification } from "@/lib/verification/stats.ts";
 import type { EventDetail, EventStatus } from "@/lib/events/types.ts";
+import { lifecycleOf, type Taps } from "@/lib/events/lifecycle.ts";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,7 @@ interface Row {
   eta_clear: EventDetail["etaClear"];
   sources: Partial<EventDetail["sources"]> | null;
   models_agreed: number | null;
+  is_demo: boolean | null;
   road_segments: { road_ref: string | null; road_name: string | null } | null;
   photos: { id: string; public_url: string | null; annotated_url: string | null; created_at: string; source: string; faces_blurred: boolean; width: number | null; height: number | null }[];
   event_timeline: { at: string; kind: string; text: string; actor: string | null }[];
@@ -43,7 +45,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     const [r] = await select<Row>(
       "events",
       "select=id,type,status,place_name,lat,lng,summary,summary_hi,confidence,started_at,last_confirmed_at,resolved_at," +
-        "passable,measurements,eta_clear,sources,models_agreed,road_segments(road_ref,road_name)," +
+        "passable,measurements,eta_clear,sources,models_agreed,is_demo,road_segments(road_ref,road_name)," +
         "photos(id,public_url,annotated_url,created_at,source,faces_blurred,width,height)," +
         `event_timeline(at,kind,text,actor)&id=eq.${id}&photos.order=created_at.desc&event_timeline.order=at.desc&event_timeline.limit=10`,
     );
@@ -60,6 +62,14 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       lastInvestigation(r.id).catch(() => null),
       eventVerification(r.id).catch(() => null),
     ]);
+    const life = lifecycleOf({
+      type: r.type, status: r.status, lastConfirmedAt: r.last_confirmed_at, reports: sources.reports, official: sources.official,
+      news: sources.news, isDemo: r.is_demo, taps: (r.sources as { taps?: Taps } | null)?.taps, etaClear: r.eta_clear, potholeSize: (measurements as { potholeSize?: string }).potholeSize,
+    });
+    // Expired but not swept yet (or a crew is on it) → still shown as Unconfirmed.
+    const lifecycle = r.resolved_at
+      ? undefined
+      : { state: life.state === "expired" ? ("unconfirmed" as const) : life.state, reason: life.reason, unconfirmedAt: life.unconfirmedAt, expiresAt: life.expiresAt };
     const checkReason = r.resolved_at ? null : whyInvestigate({ ...r, sources } as unknown as InvestigatedEvent);
     const data: EventDetail = {
       id: r.id,
@@ -85,6 +95,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       investigation,
       checkReason,
       verification,
+      lifecycle,
       etaClear: r.eta_clear,
       sources,
       photos: r.photos.map((p) => ({
