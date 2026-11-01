@@ -13,9 +13,10 @@ import Toast from "@/components/glass/Toast";
 import type { FitReport, Identified } from "@/lib/fit/check";
 import { clearWindow } from "@/lib/events/format";
 import { ago, type EventDetail } from "@/lib/events/types";
-import { loadSavedVehicle, saveVehicle, type SavedVehicle } from "@/lib/fit/saved";
+import { clearSavedVehicle, loadSavedVehicle, saveVehicle, type SavedVehicle } from "@/lib/fit/saved";
+import { pickOf, toSaved, VehicleSelect } from "./MyVehicleCard";
 import { FIT_STYLE } from "@/lib/fit/types";
-import { CATEGORIES, VEHICLES, vehicleById, categoryById, vehicleName } from "@/lib/fit/vehicles";
+import { vehicleById, categoryById, vehicleName } from "@/lib/fit/vehicles";
 import { shrinkPhoto } from "@/lib/images/shrink";
 import { eventTitle } from "@/components/route/routeData";
 import { MODEL_NAME, MODEL_WHERE } from "@/lib/verification/types";
@@ -39,7 +40,8 @@ const FACTOR_TONE: Record<string, { c: string; w: string }> = {
 
 export default function FitScreen({ id }: { id: string }) {
   const router = useRouter();
-  const fileRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const uploadRef = useRef<HTMLInputElement>(null);
   const [ev, setEv] = useState<EventDetail | null>(null);
   const [stage, setStage] = useState<Stage>("choose");
   const [steps, setSteps] = useState(STEPS_PICK);
@@ -103,6 +105,12 @@ export default function FitScreen({ id }: { id: string }) {
   const selBody = () => (pick.startsWith("v:") ? { vehicleId: pick.slice(2), roofLoad } : { category: pick.slice(2), roofLoad });
   const pickedName = pick.startsWith("v:") ? (vehicleById(pick.slice(2)) ? vehicleName(vehicleById(pick.slice(2))!) : "") : (categoryById(pick.slice(2))?.label ?? "");
 
+  function onFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    e.target.value = "";
+    if (f) void onPhoto(f);
+  }
+
   async function onPhoto(f: File) {
     const form = new FormData();
     form.append("vehicle", await shrinkPhoto(f), "vehicle.jpg");
@@ -118,6 +126,20 @@ export default function FitScreen({ id }: { id: string }) {
       setSavedNow(true);
     } else setToast("Couldn't save on this device");
   }
+  /** Save the vehicle picked in the list as "my vehicle" without running a check. */
+  function savePicked() {
+    const v = toSaved(pick, roofLoad);
+    if (v && saveVehicle(v)) {
+      setSaved(v);
+      setToast(`${v.name} is now your vehicle`);
+    } else setToast("Couldn't save on this device");
+  }
+  function removeSaved() {
+    clearSavedVehicle();
+    setSaved(null);
+    setToast("Removed — no vehicle saved on this phone");
+  }
+  const pickIsSaved = Boolean(saved && pick === pickOf(saved) && roofLoad === saved.roofLoad);
 
   const close = () => (window.history.length > 1 ? router.back() : router.push(`/event/${id}`));
   const st = report ? FIT_STYLE[report.verdict] : null;
@@ -175,25 +197,34 @@ export default function FitScreen({ id }: { id: string }) {
                     <Check size={18} aria-hidden /> Use my {saved.name}
                   </button>
                 )}
-                <button
-                  type="button"
-                  onClick={() => fileRef.current?.click()}
-                  className={`flex min-h-[52px] items-center justify-center gap-2 rounded-[14px] text-[16px] font-semibold ${saved ? "bg-accent-tint text-accent-tint-ink" : "bg-accent text-white"}`}
-                >
-                  <Camera size={18} aria-hidden /> Take or upload a photo
-                </button>
-                <input
-                  ref={fileRef}
-                  type="file"
-                  accept="image/*"
-                  capture="environment"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    e.target.value = "";
-                    if (f) void onPhoto(f);
-                  }}
-                />
+                {saved && (
+                  <div className="-mt-1 flex items-center gap-2 px-1 text-[13px] text-ink-2">
+                    <span className="min-w-0 flex-1 truncate">Saved on this phone</span>
+                    <button type="button" onClick={removeSaved} className="-my-3 h-11 shrink-0 px-1 font-semibold text-closed-ink">
+                      Remove
+                    </button>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-2">
+                  {(
+                    [
+                      [cameraRef, Camera, "Take a photo"],
+                      [uploadRef, ImageIcon, "Upload a photo"],
+                    ] as const
+                  ).map(([ref, Icon, label]) => (
+                    <button
+                      key={label}
+                      type="button"
+                      onClick={() => ref.current?.click()}
+                      className={`flex min-h-[52px] items-center justify-center gap-2 rounded-[14px] px-2 text-[15px] font-semibold ${saved ? "bg-accent-tint text-accent-tint-ink" : "bg-accent text-white"}`}
+                    >
+                      <Icon size={18} aria-hidden /> {label}
+                    </button>
+                  ))}
+                </div>
+                {/* capture → straight to the camera; no capture → the phone offers the photo library / files. */}
+                <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={onFile} />
+                <input ref={uploadRef} type="file" accept="image/*" className="hidden" onChange={onFile} />
                 <p className="m-0 px-1 text-[12px] text-ink-2">The plate is blurred before any AI sees it. The photo is used for this check only and never stored.</p>
                 <span className="px-1 text-center text-[13px] text-ink-3">or pick it</span>
               </>
@@ -201,19 +232,7 @@ export default function FitScreen({ id }: { id: string }) {
 
             <label className="glass-card flex flex-col gap-1.5 px-[14px] py-3">
               <span className="text-[13px] text-ink-2">Vehicle</span>
-              <select value={pick} onChange={(e) => setPick(e.target.value)} className="min-h-[44px] rounded-[10px] bg-white/80 px-2 text-[16px] text-ink">
-                <option value="">Choose…</option>
-                {CATEGORIES.map((c) => (
-                  <optgroup key={c.id} label={c.label}>
-                    {VEHICLES.filter((v) => v.category === c.id).map((v) => (
-                      <option key={v.id} value={`v:${v.id}`}>
-                        {vehicleName(v)}
-                      </option>
-                    ))}
-                    <option value={`c:${c.id}`}>Other {c.label.toLowerCase()} (typical size)</option>
-                  </optgroup>
-                ))}
-              </select>
+              <VehicleSelect value={pick} onChange={setPick} />
             </label>
             <label className="glass-card flex min-h-[52px] items-center justify-between gap-3 px-[14px] py-2">
               <span className="text-[15px]">Luggage or carrier on the roof</span>
@@ -227,6 +246,11 @@ export default function FitScreen({ id }: { id: string }) {
             >
               {stage === "confirm" ? `Yes, check my ${pickedName || "vehicle"}` : pick ? `Check my ${pickedName}` : "Check"}
             </button>
+            {stage === "choose" && pick && !pickIsSaved && (
+              <button type="button" onClick={savePicked} className="-my-1 h-11 self-center px-2 text-[14px] font-semibold text-link">
+                {saved ? `Make this my vehicle (instead of ${saved.name})` : "Save as my vehicle"}
+              </button>
+            )}
           </>
         )}
 
@@ -351,7 +375,7 @@ export default function FitScreen({ id }: { id: string }) {
               <span className="text-center text-[13px] text-ink-2">{savedNow ? "Saved on this phone — route rows now show if it fits." : `Your saved vehicle: ${saved.name}`}</span>
             ) : (
               <button type="button" onClick={save} className="flex min-h-[48px] items-center justify-center rounded-[14px] bg-accent text-[16px] font-semibold text-white">
-                Save my vehicle
+                {saved ? `Make this my vehicle (instead of ${saved.name})` : "Save my vehicle"}
               </button>
             )}
             <button type="button" onClick={() => setStage("choose")} className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-[14px] bg-accent-tint text-[15px] font-semibold text-accent-tint-ink">
