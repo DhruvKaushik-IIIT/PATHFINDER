@@ -28,6 +28,8 @@ This project is built **one phase at a time**. The developer (Dhruv) has limited
 9. **PARTS inside a phase.** Every phase below is split into **Part A / B / C**. After each Part: run/test it → `git commit` + `git push` → reply with a short report (what works, how to check it, anything broken) → ask **"Continue to Part X?"** and WAIT. Never do two Parts in one go. If the user says "continue", do the next Part only.
 10. **Usage limits:** if a session is about to end or context is getting long, stop at the end of the current task, commit + push, and write a 3-line "where I stopped" note in the Phase Tracker so the next session can resume.
 
+11. **Nothing important lives only in chat.** Any decision, design, rule, number or open question agreed in a session is written to the repo **in the same turn** and pushed: bigger designs → their own file in `docs/` (e.g. `docs/event-lifecycle.md`), small decisions → a dated line in `docs/decisions.md`, phase status → the Phase Tracker. Documents for the submission (demo script, feature list) are committed too. Before a session ends, check: "is anything we agreed only in this chat?"
+
 ## 0.5 Where this runs
 - Usually a **Claude Code cloud session** on the GitHub repo `DhruvKaushik-IIIT/PATHFINDER` (environment `meta_hackathon`). Sometimes a local session on Dhruv's Mac.
 - Cloud sessions work on a **branch** and push it; tell the user when a PR is ready to merge into `main` (they merge on GitHub). Never force-push `main`.
