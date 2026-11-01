@@ -2,8 +2,9 @@
 
 // Frame 08 Nearby (docs/design/glass-html/Nearby.dc.html): radius circle on the map, floating glass
 // radius picker, sheet with the AI summary + ranked list. Centre = ?lat&lng[&name], else your
-// location, else Mandi.
-import { ChevronLeft, ChevronRight, CloudRain } from "lucide-react";
+// location, else the area you were looking at on Home's map (?mlat&mlng), else the place you picked
+// last time, else we ASK ("Where should we look?"). No default town (Nov 1).
+import { ChevronLeft, ChevronRight, CloudRain, LocateFixed, MapPin } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -19,6 +20,8 @@ import SlopeRows from "@/components/slope/SlopeRows";
 import type { SlopePin } from "@/lib/slope/types";
 import { replayLabel, type AreaRisk } from "@/lib/risk/types";
 import { circle } from "./circle";
+import PlaceSearch from "@/components/home/PlaceSearch";
+import { HP_BOUNDS, loadNearbyPlace, POPULAR_PLACES, saveNearbyPlace } from "@/lib/geo/himachal";
 
 const MapView = dynamic(() => import("@/components/map/MapView"), {
   ssr: false,
@@ -26,10 +29,9 @@ const MapView = dynamic(() => import("@/components/map/MapView"), {
 });
 
 const RADII = [5, 10, 25, 50] as const;
-const MANDI = { lat: 31.708, lng: 76.932, name: "Mandi" };
 const BY: Record<string, string> = { baseten: "Muse Spark Open", meta: "Muse Spark", mock: "mock data", code: "Pathfinder" };
 
-type Center = { lat: number; lng: number; name: string | null; isMe: boolean };
+type Center = { lat: number; lng: number; name: string | null; isMe: boolean; source: "url" | "me" | "map" | "saved" | "picked" };
 
 export default function NearbyScreen() {
   const params = useSearchParams();
@@ -48,21 +50,56 @@ export default function NearbyScreen() {
   const [showRisk, setShowRisk] = useState<boolean | null>(null); // null = follow the forecast (on if risky)
   const replay = params.get("replay") === "1";
 
-  // 1. Where are we looking? URL → my location (quick, coarse) → Mandi.
+  // 1. Where are we looking? URL → my location → Home's map view → last picked place → ask.
+  const [asking, setAsking] = useState(false);
+  const [locNote, setLocNote] = useState<string | null>(null);
   useEffect(() => {
     const lat = Number(params.get("lat"));
     const lng = Number(params.get("lng"));
     if (params.get("lat") && Number.isFinite(lat) && Number.isFinite(lng)) {
-      setCenter({ lat, lng, name: params.get("name"), isMe: false });
+      setCenter({ lat, lng, name: params.get("name"), isMe: params.get("me") === "1", source: params.get("me") === "1" ? "me" : "url" });
       return;
     }
-    if (!("geolocation" in navigator)) return setCenter({ ...MANDI, isMe: false });
+    const fallback = (why: string | null) => {
+      const mlat = Number(params.get("mlat"));
+      const mlng = Number(params.get("mlng"));
+      if (params.get("mlat") && Number.isFinite(mlat) && Number.isFinite(mlng)) {
+        return setCenter({ lat: mlat, lng: mlng, name: null, isMe: false, source: "map" });
+      }
+      const saved = loadNearbyPlace();
+      if (saved) return setCenter({ ...saved, isMe: false, source: "saved" });
+      setLocNote(why);
+      setAsking(true);
+      setLoading(false);
+    };
+    if (!("geolocation" in navigator)) return fallback(null);
     navigator.geolocation.getCurrentPosition(
-      (p) => setCenter({ lat: p.coords.latitude, lng: p.coords.longitude, name: null, isMe: true }),
-      () => setCenter({ ...MANDI, isMe: false }),
+      (p) => setCenter({ lat: p.coords.latitude, lng: p.coords.longitude, name: null, isMe: true, source: "me" }),
+      (err) => fallback(err.code === err.PERMISSION_DENIED ? "Location is off" : "Couldn't find your location"),
       { enableHighAccuracy: false, timeout: 6000, maximumAge: 5 * 60_000 },
     );
   }, [params]);
+
+  function pickCenter(p: { name: string; lat: number; lng: number }) {
+    saveNearbyPlace(p);
+    setAsking(false);
+    setLocNote(null);
+    needsFit.current = true;
+    setCenter({ ...p, isMe: false, source: "picked" });
+  }
+  function useMyLocation() {
+    if (!("geolocation" in navigator)) return setLocNote("This browser can't share your location");
+    navigator.geolocation.getCurrentPosition(
+      (p) => {
+        setAsking(false);
+        setLocNote(null);
+        needsFit.current = true;
+        setCenter({ lat: p.coords.latitude, lng: p.coords.longitude, name: null, isMe: true, source: "me" });
+      },
+      (err) => setLocNote(err.code === err.PERMISSION_DENIED ? "Location is off — turn it on in your browser settings, or pick a place" : "Couldn't find your location — pick a place"),
+      { enableHighAccuracy: false, timeout: 10_000, maximumAge: 60_000 },
+    );
+  }
 
   // 2. Load the ranked list + summary for this centre and radius.
   useEffect(() => {
@@ -120,8 +157,9 @@ export default function NearbyScreen() {
 
   const fit = useCallback(() => {
     const map = mapRef.current;
-    if (!map || !center) return;
+    if (!map) return;
     needsFit.current = false;
+    if (!center) return void map.fitBounds(HP_BOUNDS, { padding: { top: 110, bottom: 400, left: 16, right: 16 }, duration: 0 });
     const dLat = radius / 111;
     const dLng = radius / (111 * Math.cos((center.lat * Math.PI) / 180));
     map.fitBounds(
@@ -138,7 +176,8 @@ export default function NearbyScreen() {
     fit();
   }, [fit]);
 
-  const place = data?.center.name ?? center?.name ?? (center?.isMe ? "you" : "Mandi");
+  const place = data?.center.name ?? center?.name ?? (center?.isMe ? "you" : "this area");
+  const sourceNote = center?.source === "map" ? "Centred on the map view" : center?.source === "saved" ? "Your last chosen place" : center?.isMe ? "Your location" : null;
 
   return (
     <main className="fixed inset-0 overflow-hidden">
@@ -174,6 +213,7 @@ export default function NearbyScreen() {
         >
           <ChevronLeft size={22} strokeWidth={2.4} aria-hidden />
         </button>
+        {center && (
         <div role="radiogroup" aria-label="Search radius" className="glass-float flex flex-1 gap-[2px] rounded-[23px] p-[3px]">
           {RADII.map((r) => (
             <button
@@ -190,9 +230,10 @@ export default function NearbyScreen() {
             </button>
           ))}
         </div>
+        )}
       </div>
       {/* rain-risk layer chip (Risk Forecast v1) */}
-      <div className="absolute right-[14px] top-[112px] z-10">
+      <div className={`absolute right-[14px] top-[112px] z-10 ${center ? "" : "hidden"}`}>
         <button
           type="button"
           aria-pressed={riskOn}
@@ -214,8 +255,47 @@ export default function NearbyScreen() {
         </div>
       )}
 
-      <Sheet label="Nearby road conditions" initial="half" halfPx={340}>
-        {!data ? (
+      <Sheet label="Nearby road conditions" initial="half" halfPx={asking ? 400 : 340}>
+        {asking ? (
+          <div className="flex flex-col gap-3">
+            <div>
+              <h1 className="m-0 text-[20px] font-bold leading-tight">Where should we look?</h1>
+              <p className="m-0 mt-1 text-[14px] leading-[1.4] text-ink-2">
+                {locNote ? `${locNote}. ` : ""}Pick a place and we&apos;ll show road issues around it.
+              </p>
+            </div>
+            <PlaceSearch placeholder="Search a town, pass or trek" showMic={false} onPick={(p) => pickCenter({ name: p.name, lat: p.lat, lng: p.lng })} />
+            <button
+              type="button"
+              onClick={useMyLocation}
+              className="flex h-11 items-center justify-center gap-2 rounded-[14px] bg-accent-tint text-[15px] font-semibold text-accent-tint-ink"
+            >
+              <LocateFixed size={17} strokeWidth={2.2} aria-hidden />
+              Use my location
+            </button>
+            <div>
+              <p className="m-0 mb-2 text-[13px] font-semibold text-ink-3">Popular places</p>
+              <div className="flex flex-wrap gap-2">
+                {POPULAR_PLACES.map((p) => (
+                  <button
+                    key={p.name}
+                    type="button"
+                    onClick={() => pickCenter(p)}
+                    className="flex h-11 items-center gap-1.5 rounded-full bg-white/[0.84] px-4 text-[14px] font-semibold text-ink"
+                  >
+                    <MapPin size={14} strokeWidth={2.2} className="text-accent" aria-hidden />
+                    {p.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {center && (
+              <button type="button" onClick={() => setAsking(false)} className="-my-2 h-11 self-start px-1 text-[14px] font-semibold text-link">
+                Cancel
+              </button>
+            )}
+          </div>
+        ) : !data ? (
           loading ? (
             <div className="flex flex-col gap-3 py-1" aria-busy>
               <span className="h-5 w-64 animate-pulse rounded-lg bg-black/10" />
@@ -256,6 +336,13 @@ export default function NearbyScreen() {
                   </button>
                 )}
               </p>
+            </div>
+
+            <div className="-my-2 flex items-center gap-2 text-[13px] text-ink-3">
+              <span className="min-w-0 flex-1 truncate">{sourceNote ?? `Around ${place}`}</span>
+              <button type="button" onClick={() => setAsking(true)} className="h-11 shrink-0 px-1 font-semibold text-link">
+                Change place
+              </button>
             </div>
 
             {risk && (risk.level === "moderate" || risk.level === "high") && (

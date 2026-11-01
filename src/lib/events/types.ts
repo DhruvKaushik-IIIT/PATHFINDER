@@ -146,3 +146,26 @@ export interface NearbyResult {
   /** "baseten" / "meta" when an AI wrote the summary; "code" for the template. */
   summaryBy: string;
 }
+
+/** "Across Himachal right now" (lib/events/top.ts): one of the top 10, ranked by reach then damage. */
+export interface TopItem extends MapEvent {
+  rank: number;
+  score: number;
+  /** "NH-3" */
+  road: string | null;
+  vehiclesPerDay: number;
+  /** Nearest traveller hub within 40 km ("Manali"). */
+  nearHub: string | null;
+  /** Active watched trips through it. */
+  watchers: number;
+  /** Plain reasons shown under the row: "NH-3 · ~6k vehicles/day", "~12 km from Manali", "2 watching". */
+  why: string[];
+}
+
+export interface TopResult {
+  items: TopItem[];
+  /** All open issues across Himachal (not only the top 10). */
+  counts: { closed: number; oneLane: number; slow: number; other: number };
+  total: number;
+  checkedAt: string;
+}
