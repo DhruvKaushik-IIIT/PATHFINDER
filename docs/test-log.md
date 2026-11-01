@@ -1,18 +1,18 @@
 # Test log — manual testing on the live site (iPhone)
 
 Live: https://pathfinder1-ten.vercel.app · Tester: Dhruv · Guide: Claude (no fixes unless Dhruv says "fix it").
-`pnpm demo-reset` run: Nov 1 (start of testing) and again after F1.
+`pnpm demo-reset` run: Nov 1 (start of testing), after F1, and at the end of testing (Nov 2). B1–B3 fixed and merged (#27, #28). Session closed.
 
 ## Status (end-to-end flows, Dhruv asked for role flows instead of UI basics)
 | # | Flow | Status |
 |---|---|---|
 | F1 | Incident loop: traveller reports → AI verifies → PWD office queue → crew builder → Neelam (crew) on site → field update + voice → traveller sees repairs / note / Road Watch alert → fully open → resolved, crew released | ✅ passed Nov 1 (bugs B2, B3) |
-| F2 | Traveller AI: Route Check agent verdict, What-If, Avoided on this trip, vehicle fit, share card, Start in Google Maps, Drive Watch simulate (EN/हिन्दी voice) | ⬜ |
-| F3 | Slope Sentinel: slope photo → 2-model reading → risk → route banner → Command Centre "Slopes to inspect" | ⬜ |
-| F4 | Doubt loop: event goes Unconfirmed / "Still there?" votes close it early / Investigator "Check again" | ⬜ |
-| F5 | Office advisory → travellers watching get it in /alerts (EN + हिन्दी) | ⬜ |
-| F6 | Scout loop: Me & Scout settings → scout request alert → photo → bonus points | ⬜ |
-| F7 | PWA install, offline page, link preview | ⬜ |
+| F2 | Traveller AI: Route Check agent verdict, What-If, Avoided on this trip, vehicle fit, share card, Start in Google Maps, Drive Watch simulate (EN/हिन्दी voice) | ✅ tested by Dhruv on his own (Nov 2), no bugs reported |
+| F3 | Slope Sentinel: slope photo → 2-model reading → risk → route banner → Command Centre "Slopes to inspect" | ✅ tested by Dhruv on his own (Nov 2), no bugs reported |
+| F4 | Doubt loop: event goes Unconfirmed / "Still there?" votes close it early / Investigator "Check again" | ✅ tested by Dhruv on his own (Nov 2), no bugs reported |
+| F5 | Office advisory → travellers watching get it in /alerts (EN + हिन्दी) | ✅ tested by Dhruv on his own (Nov 2), no bugs reported |
+| F6 | Scout loop: Me & Scout settings → scout request alert → photo → bonus points | ✅ tested by Dhruv on his own (Nov 2), no bugs reported |
+| F7 | PWA install, offline page, link preview | ✅ tested by Dhruv on his own (Nov 2), no bugs reported |
 
 Legend: ✅ passed · ❌ failed (see bugs) · ⚠️ passed with minor issues · ⏳ in progress · ⬜ not tested
 
