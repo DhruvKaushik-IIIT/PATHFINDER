@@ -2,7 +2,8 @@
 // SAM measures it (and blurs faces/plates) → code compares with the event's first photo and with what
 // the official entered (progress.ts) → photo + official_updates row + event status/ETA/timeline →
 // Road Watch for travellers on that road. Mismatches are flagged on the timeline, not hidden.
-import { transcribe } from "../ai/router.ts";
+import { transcribe, translateSiteNote } from "../ai/router.ts";
+import { SKILL_WORD, type Skill } from "../crew/needs.ts";
 import { debrisVolumeM3 } from "../clearing/estimate.ts";
 import { insert, publicUrl, select, update, upload } from "../db/supabase.ts";
 import { releaseCrew } from "../crew/builder.ts";
@@ -139,6 +140,16 @@ export async function postFieldUpdate(official: Official, input: FieldInput): Pr
   const samOk = !p.degraded.includes("AI measurement unavailable right now");
   const check = progressCheck({ now: samOk ? metricsOf(p.measurements) : null, before, claimedPct: input.pctCleared, status: input.status });
   const transcript = voice?.data?.text ?? null;
+  // Who is speaking (Nov 1 "Note from the site"): the signed-in person, with their crew role if a worker.
+  const [me] = official.worker
+    ? await select<{ skill: Skill }>("workers", `select=skill&id=eq.${official.worker.id}&limit=1`).catch(() => [])
+    : [];
+  const by = { name: official.name, role: me ? SKILL_WORD[me.skill][0] : official.role === "crew" ? "crew member" : "official" };
+  // Translate once at post time (Baseten → Meta, < 1 cent); viewers never trigger AI. Null = show as transcribed.
+  const translated = transcript ? (await translateSiteNote(transcript)).data : null;
+  const note = transcript
+    ? { text: transcript, en: translated?.en ?? null, hi: translated?.hi ?? null, lang: translated?.lang ?? null, by: by.name, role: by.role }
+    : null;
   const now = new Date();
   const eta = input.status === "open" ? null : input.fullyOpenBy ? nextIstTime(input.fullyOpenBy, now) : null;
   const newStatus = FIELD_STATUS[input.status].event;
@@ -178,7 +189,7 @@ export async function postFieldUpdate(official: Official, input: FieldInput): Pr
     eta_full_open: eta?.toISOString() ?? null,
     machines,
     photo_id: pid,
-    ai_check: { ...aiCheck, transcript, crew: crew?.name ?? null, org: official.org },
+    ai_check: { ...aiCheck, transcript, note, by, crew: crew?.name ?? null, org: official.org },
     is_demo: official.isDemo,
   });
 
@@ -225,8 +236,8 @@ export async function postFieldUpdate(official: Official, input: FieldInput): Pr
     event_id: ev.id,
     at: now.toISOString(),
     kind: "official",
-    text: `Field update: ${parts.join(" · ")}${flag}${transcript ? ` · note: “${transcript.slice(0, 200)}”` : ""}`,
-    actor: crew ? `${official.org} · ${crew.name}` : official.org,
+    text: `Field update: ${parts.join(" · ")}${flag}${transcript ? ` · voice note from ${by.name}` : ""}`,
+    actor: [official.org, crew?.name, official.role === "crew" ? by.name : null].filter(Boolean).join(" · "),
     data: { updateId: upd!.id, photoId: pid, aiCheck: check.level },
     is_demo: official.isDemo,
   });

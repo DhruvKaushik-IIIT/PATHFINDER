@@ -4,7 +4,7 @@
 // CREWS AT WORK — each crew's progress (sent → opened → on site → % cleared), and
 // NEEDS A CREW — the top unstaffed sites with what they need + "Build crew" (→ /official/crew/[id]).
 // Advisory (14b) stays here for the top site. Plain code; no AI on this card.
-import { ChevronRight, HardHat, Megaphone } from "lucide-react";
+import { ChevronRight, HardHat, Megaphone, Mic } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import type { CrewBoardItem, ToStaffItem } from "@/lib/crew/builder";
@@ -82,6 +82,14 @@ export default function CrewPlanCard({ version, advisoryEventId, onMessage }: { 
                         ))}
                       </span>
                       <span className="text-[12px] font-semibold text-open-ink">{s.text}</span>
+                      {c.note && (
+                        <span className="flex items-start gap-1.5 text-[12px] leading-snug text-ink-2">
+                          <Mic size={13} strokeWidth={2.2} className="mt-px shrink-0 text-accent" aria-hidden />
+                          <span className="line-clamp-2">
+                            <b className="font-semibold text-ink">{c.note.by}</b> · {ago(c.note.at)}: “{c.note.text}”
+                          </span>
+                        </span>
+                      )}
                     </li>
                   );
                 })}
