@@ -3,7 +3,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { approveDispatch } from "@/lib/official/approve.ts";
-import { requireOfficial } from "@/lib/official/guard.ts";
+import { requireOffice } from "@/lib/official/guard.ts";
 import { dispatchPlan } from "@/lib/official/planDispatch.ts";
 import { checkLimit } from "@/lib/guard/rateLimit.ts";
 
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 120;
 
 export async function GET(req: Request) {
-  const official = await requireOfficial();
+  const official = await requireOffice();
   if (official instanceof NextResponse) return official;
   const limited = new URL(req.url).searchParams.get("ai") === "1" ? checkLimit(req, "official") : null;
   const ai = new URL(req.url).searchParams.get("ai") === "1" && !limited;
@@ -41,7 +41,7 @@ const Body = z.object({
 });
 
 export async function POST(req: Request) {
-  const official = await requireOfficial();
+  const official = await requireOffice();
   if (official instanceof NextResponse) return official;
   const body = Body.safeParse(await req.json().catch(() => null));
   if (!body.success) return NextResponse.json({ ok: false, error: "steps expected" }, { status: 400 });

@@ -15,6 +15,7 @@ import { ROUTE_CHECK_SYSTEM, routeCheckUserText } from "./prompts/routeCheck.ts"
 import { NEARBY_SYSTEM, nearbyUserText } from "./prompts/nearby.ts";
 import { NEWS_PARSE_SYSTEM, newsParseUserText, newsSearchPrompt } from "./prompts/news.ts";
 import { ADVISORY_SYSTEM, advisoryUserText } from "./prompts/advisory.ts";
+import { CREW_SYSTEM, crewUserText } from "./prompts/crew.ts";
 import { DISPATCH_SYSTEM, dispatchUserText } from "./prompts/dispatch.ts";
 import { INVESTIGATE_SYSTEM, investigateUserText } from "./prompts/investigate.ts";
 import { SLOPE_CHECK_SYSTEM, SLOPE_SYSTEM, slopeCheckUserText, slopeUserText } from "./prompts/slope.ts";
@@ -23,7 +24,7 @@ import { runSlopeTool, SLOPE_TOOLS, type SlopeToolContext } from "./tools/slope.
 import { SlopeCheck, SlopeReading, SlopeRisk, FitAssessment, FitCheck, VehicleId } from "./schemas.ts";
 import { VEHICLE_SYSTEM, vehicleUserText } from "./prompts/vehicle.ts";
 import { FIT_CHECK_SYSTEM, FIT_SYSTEM, fitCheckUserText, fitUserText } from "./prompts/fit.ts";
-import { Advisory, ClaimSet, DispatchProposal, Investigation, jsonSchemaFormat, NearbySummary, NewsItems, parseJson, RouteVerdict, Verdict, type Claim } from "./schemas.ts";
+import { Advisory, ClaimSet, CrewBrief, DispatchProposal, Investigation, jsonSchemaFormat, NearbySummary, NewsItems, parseJson, RouteVerdict, Verdict, type Claim } from "./schemas.ts";
 import { DISPATCH_TOOLS, runDispatchTool, type DispatchContext } from "./tools/dispatch.ts";
 import { INVESTIGATE_TOOLS, runInvestigateTool, type InvestigateContext } from "./tools/investigate.ts";
 import { ist, ROUTE_CHECK_TOOLS, runRouteCheckTool, type RouteCheckContext } from "./tools/routeCheck.ts";
@@ -813,6 +814,22 @@ export function draftAdvisory(input: Parameters<typeof advisoryUserText>[0], tem
   });
   return runJob<Advisory>({
     purpose: "advisory_draft",
+    attempts: [attempt("baseten", MODELS.sparkOpen), attempt("meta", MODELS.spark)],
+    mock: template,
+    lastResort: template,
+  });
+}
+
+/** Crew builder note (Option B): Baseten Spark Open → Meta Spark → code template. Never throws. */
+export function crewBrief(input: Parameters<typeof crewUserText>[0], template: () => CrewBrief): Promise<JobResult<CrewBrief>> {
+  const content: ChatContent = [{ type: "text", text: crewUserText(input) }];
+  const attempt = (provider: Provider, model: string): Attempt<CrewBrief> => ({
+    provider,
+    model,
+    run: (c) => chatJson(c, provider, model, { name: "crew_brief", schema: CrewBrief, system: CREW_SYSTEM, content }),
+  });
+  return runJob<CrewBrief>({
+    purpose: "crew_brief",
     attempts: [attempt("baseten", MODELS.sparkOpen), attempt("meta", MODELS.spark)],
     mock: template,
     lastResort: template,

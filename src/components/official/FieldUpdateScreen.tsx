@@ -35,7 +35,7 @@ const CHECK_STYLE = {
   unknown: { bg: "rgba(118,118,128,0.12)", ink: "#48484A", Icon: CircleHelp },
 };
 
-export default function FieldUpdateScreen({ eventId }: { eventId: string }) {
+export default function FieldUpdateScreen({ eventId, back = "/official", final = false }: { eventId: string; /** Where Close / Post go: the Command Centre, or a crew member's "My job". */ back?: string; /** "Job done": start on Fully open. */ final?: boolean }) {
   const router = useRouter();
   const mapRef = useRef<MapRef>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -49,8 +49,8 @@ export default function FieldUpdateScreen({ eventId }: { eventId: string }) {
   const [preview, setPreview] = useState<string | null>(null);
   const [checking, setChecking] = useState(false);
   const [measured, setMeasured] = useState<PhotoCheck | null>(null);
-  const [status, setStatus] = useState<FieldStatus>("clearing");
-  const [pct, setPct] = useState(50);
+  const [status, setStatus] = useState<FieldStatus>(final ? "open" : "clearing");
+  const [pct, setPct] = useState(final ? 100 : 50);
   const [openBy, setOpenBy] = useState("");
   const [machines, setMachines] = useState("");
   const [voice, setVoice] = useState<WavRecording | null>(null);
@@ -162,7 +162,7 @@ export default function FieldUpdateScreen({ eventId }: { eventId: string }) {
       if (res.status === 401) return router.replace("/official/login");
       const j = (await res.json()) as { ok: boolean; data?: { resolved: boolean; check: { level: string } }; error?: string };
       if (!j.ok || !j.data) throw new Error(j.error);
-      router.push(`/official?updated=${j.data.resolved ? "open" : j.data.check.level}`);
+      router.push(`${back}?updated=${j.data.resolved ? "open" : j.data.check.level}`);
     } catch (err) {
       setToast((err as Error).message || "Couldn't post the update — try again");
       setPosting(false);
@@ -194,7 +194,7 @@ export default function FieldUpdateScreen({ eventId }: { eventId: string }) {
             <button
               type="button"
               aria-label="Close"
-              onClick={() => router.push("/official")}
+              onClick={() => router.push(back)}
               className="flex size-[44px] shrink-0 items-center justify-center rounded-full bg-[rgba(118,118,128,0.14)] text-ink-2"
             >
               <X size={18} strokeWidth={2.4} aria-hidden />

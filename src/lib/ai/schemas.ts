@@ -164,6 +164,14 @@ export const Advisory = z.object({
 });
 export type Advisory = z.infer<typeof Advisory>;
 
+/** Crew builder (Option B): the model explains a code-picked crew; it never sets numbers or people. */
+export const CrewBrief = z.object({
+  why: z.string().describe("2 short sentences: what the site needs and why this crew fits"),
+  whyHi: z.string().describe("the same in simple Hindi (Devanagari)"),
+  safety: z.array(z.string()).max(3).describe("1–3 short site-safety reminders for this site"),
+});
+export type CrewBrief = z.infer<typeof CrewBrief>;
+
 // ---------------------------------------------------------------- Investigator (Phase 5)
 
 /** What the Investigator submits. Code decides what changes (it never sets an event's status). */

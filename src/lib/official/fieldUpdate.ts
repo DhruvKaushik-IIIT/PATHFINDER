@@ -5,6 +5,7 @@
 import { transcribe } from "../ai/router.ts";
 import { debrisVolumeM3 } from "../clearing/estimate.ts";
 import { insert, publicUrl, select, update, upload } from "../db/supabase.ts";
+import { releaseCrew } from "../crew/builder.ts";
 import { eventTitle, type EventStatus } from "../events/types.ts";
 import { clock } from "../geo/format.ts";
 import { preparePhoto, processPhoto, type PreparedPhoto, type ProcessedPhoto } from "../reports/processPhoto.ts";
@@ -53,6 +54,8 @@ async function loadEvent(official: Official, eventId: string): Promise<EventRow>
     `select=id,type,status,place_name,lat,lng,confidence,passable,measurements,sources,is_demo&id=eq.${eventId}&resolved_at=is.null&limit=1`,
   );
   if (!row || kmBetween(row, official.district) > official.district.radiusKm) throw new FieldError("Event not found in your district (or already cleared).", 404);
+  // Crew accounts (Option B) may update only the job their crew is on.
+  if (official.role === "crew" && official.worker?.eventId !== row.id) throw new FieldError("This isn't your crew's job.", 403);
   // Judges' demo account (Phase 6D): it may change demo events only, never real reports (`pnpm seed` resets them).
   if (official.isDemo && !(row as EventRow & { is_demo?: boolean }).is_demo)
     throw new FieldError("The demo account can update demo events only — this one is a real report.", 403);
@@ -206,7 +209,10 @@ export async function postFieldUpdate(official: Official, input: FieldInput): Pr
     sources: { ...sources, official: sources.official + 1 },
     ...(resolved && { resolved_at: now.toISOString() }),
   });
-  if (resolved && crew) await update("crews", `id=eq.${crew.id}`, { current_event_id: null, available: true });
+  if (resolved && crew) {
+    await update("crews", `id=eq.${crew.id}`, { current_event_id: null, available: true, status: "done", done_at: now.toISOString() });
+    await releaseCrew(crew.id, ev); // assembled crews go back to the pool (Option B)
+  }
 
   const parts = [
     resolved ? "Fully open" : `${input.pctCleared}% cleared · ${FIELD_STATUS[input.status].label.toLowerCase()}`,

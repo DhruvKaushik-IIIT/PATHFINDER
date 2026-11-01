@@ -3,7 +3,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { advisoryDraft, publishAdvisory } from "@/lib/official/advisory.ts";
-import { requireOfficial } from "@/lib/official/guard.ts";
+import { requireOffice } from "@/lib/official/guard.ts";
 import { checkLimit, limitedResponse } from "@/lib/guard/rateLimit.ts";
 import { currentUserId } from "@/lib/me.ts";
 
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 export async function GET(req: Request) {
-  const official = await requireOfficial();
+  const official = await requireOffice();
   if (official instanceof NextResponse) return official;
   const eventId = new URL(req.url).searchParams.get("eventId") ?? "";
   const limited = checkLimit(req, "official");
@@ -33,7 +33,7 @@ const Body = z.object({
 });
 
 export async function POST(req: Request) {
-  const official = await requireOfficial();
+  const official = await requireOffice();
   if (official instanceof NextResponse) return official;
   const body = Body.safeParse(await req.json().catch(() => null));
   if (!body.success) return NextResponse.json({ ok: false, error: "The English text is required (10–400 characters)." }, { status: 400 });

@@ -6,8 +6,9 @@ import { hasSession } from "@/lib/official/auth.ts";
 export const metadata: Metadata = { title: "Field update · Pathfinder" };
 export const dynamic = "force-dynamic";
 
-export default async function Page({ params }: { params: Promise<{ eventId: string }> }) {
+export default async function Page({ params, searchParams }: { params: Promise<{ eventId: string }>; searchParams: Promise<{ from?: string; final?: string }> }) {
   if (!(await hasSession())) redirect("/official/login");
   const { eventId } = await params;
-  return <FieldUpdateScreen eventId={eventId} />;
+  const q = await searchParams;
+  return <FieldUpdateScreen eventId={eventId} back={q.from === "crew" ? "/crew" : "/official"} final={q.final === "1"} />;
 }

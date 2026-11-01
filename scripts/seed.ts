@@ -168,6 +168,8 @@ const fromNow = (h: number) => new Date(Date.now() + h * 3_600_000).toISOString(
 
 if (process.argv.includes("--wipe")) {
   // Children first; events cascade to their timeline.
+  // Workers + machines (0004) point at crews/users; clear them first (skipped if the table doesn't exist yet).
+  for (const t of ["workers", "machines"]) await req("DELETE", `${t}?is_demo=eq.true`).catch(() => console.log(`(no ${t} table yet)`));
   for (const t of ["alerts", "slope_observations", "scout_requests", "slope_sites", "watched_trips", "news_items", "official_updates", "crews", "claims", "photos", "reports", "event_timeline", "events", "users"]) {
     await req("DELETE", `${t}?is_demo=eq.true`);
     console.log(`wiped demo rows from ${t}`);
@@ -241,12 +243,12 @@ console.log(`\nseeded ${events.length} demo events + ${timeline.length} timeline
 const crewId = (n: number) => `00000000-0000-4000-9000-${String(n).padStart(12, "0")}`;
 const crews = [
   { id: crewId(1), org: "PWD Mandi (demo)", district: "Mandi", name: "Crew A", machines: ["JCB", "JCB"], available: false, current_event_id: id(1) },
-  { id: crewId(2), org: "PWD Mandi (demo)", district: "Mandi", name: "Crew B", machines: ["JCB", "Tipper"], available: true, current_event_id: null },
-  { id: crewId(3), org: "PWD Mandi (demo)", district: "Mandi", name: "Crew C", machines: ["Excavator"], available: true, current_event_id: null },
-  { id: crewId(4), org: "PWD Mandi (demo)", district: "Mandi", name: "Crew D", machines: ["JCB"], available: true, current_event_id: null },
   { id: crewId(5), org: "BRO (demo)", district: "Lahaul-Spiti", name: "Snow cutter 1", machines: ["Snow cutter"], available: false, current_event_id: id(6) },
 ].map((c) => ({ ...c, is_demo: true }));
 await req("POST", "crews?on_conflict=id", crews, "resolution=merge-duplicates,return=minimal");
+// Option B: the old placeholder Crews B–D are gone — free workers + machines are assembled per job instead.
+// Crews assembled during demos are deleted too (their people/machines go back to the pool via seed-crews).
+await req("DELETE", `crews?is_demo=is.true&id=not.in.(${crewId(1)},${crewId(5)})`);
 console.log(`seeded ${crews.length} demo crews`);
 
 // ---------------------------------------------------------------- demo scouts (Mandi leaderboard on /me)
