@@ -8,6 +8,7 @@ import { setWorkerUrl, type StyleSpecification } from "maplibre-gl";
 import { useEffect, useState, type Ref } from "react";
 import Map, { AttributionControl, Layer, Marker, Source, type MapRef } from "react-map-gl/maplibre";
 import type { MapEvent } from "@/lib/events/types";
+import { HP_VIEW } from "@/lib/geo/himachal";
 import EventPin from "./EventPin";
 import { loadGlassStyle } from "./glassStyle";
 
@@ -15,7 +16,6 @@ import { loadGlassStyle } from "./glassStyle";
 // predev/prebuild copy it into public/vendor/ (same installed version).
 setWorkerUrl("/vendor/maplibre-gl-worker.mjs");
 
-export const MANDI = { latitude: 31.708, longitude: 76.932 };
 // Pan freely across North India so routes from Delhi / Punjab / J&K stay visible (7.6).
 const NORTH_INDIA: [number, number, number, number] = [72, 26, 82, 35]; // W, S, E, N
 
@@ -84,7 +84,7 @@ export default function MapView({
     <Map
       ref={mapRef}
       mapStyle={style}
-      initialViewState={initialView ?? { ...MANDI, zoom: 9 }}
+      initialViewState={initialView ?? HP_VIEW}
       maxBounds={NORTH_INDIA}
       minZoom={5}
       style={{ position: "absolute", inset: 0 }}
