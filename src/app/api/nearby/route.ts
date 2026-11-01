@@ -27,7 +27,11 @@ export async function GET(req: Request) {
   try {
     const data = await nearby(lat, lng, radiusKm, { name, summary: summary === "1" && !limited });
     if (limited) return NextResponse.json({ ok: true, data, degraded: limited.message });
-    return NextResponse.json({ ok: true, data, ...(summary === "1" && data.summaryBy === "code" && data.items.length > 0 && { degraded: "AI summary unavailable right now" }) });
+    const aiMissing = summary === "1" && data.summaryBy === "code" && data.items.length > 0;
+    return NextResponse.json(
+      { ok: true, data, ...(aiMissing && { degraded: "AI summary unavailable right now" }) },
+      aiMissing ? undefined : { headers: { "Cache-Control": "public, s-maxage=60, stale-while-revalidate=300" } },
+    );
   } catch (err) {
     console.error("[nearby] failed:", (err as Error).message);
     return NextResponse.json({ ok: true, data: null, degraded: "Nearby is unavailable right now" });

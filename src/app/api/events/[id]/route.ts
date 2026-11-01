@@ -98,7 +98,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
       })),
       timeline: r.event_timeline,
     };
-    return NextResponse.json({ ok: true, data });
+    // Short edge cache: repeat opens are instant; a crew/official update shows up within ~10–40 s.
+    return NextResponse.json({ ok: true, data }, { headers: { "Cache-Control": "public, s-maxage=10, stale-while-revalidate=30" } });
   } catch (err) {
     console.error("[event] query failed:", (err as Error).message);
     return NextResponse.json({ ok: true, data: null, degraded: "event details unavailable right now" });

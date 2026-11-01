@@ -35,7 +35,7 @@ export async function GET(req: Request) {
       depart ? new Date(depart) : new Date(),
     );
     const data = await routeRisk(plan, { replay });
-    return NextResponse.json({ ok: true, data, ...(q.data.replay === "1" && !replay && { degraded: "no weather replay saved — showing the live forecast" }) });
+    return NextResponse.json({ ok: true, data, ...(q.data.replay === "1" && !replay && { degraded: "no weather replay saved — showing the live forecast" }) }, { headers: { "Cache-Control": "public, s-maxage=600, stale-while-revalidate=1800" } });
   } catch (err) {
     console.error("[risk/route] failed:", (err as Error).message);
     return NextResponse.json({ ok: true, data: null, degraded: "Rain forecast unavailable right now" });
