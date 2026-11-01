@@ -35,7 +35,9 @@ export async function GET(req: Request) {
       { name: tn || "Destination", lat: to[0], lng: to[1] },
       depart ? new Date(depart) : new Date(),
     );
-    return NextResponse.json({ ok: true, data: plan, ...(degraded && { degraded }) });
+    // Edge cache (Nov 1 speed fix): a new route needs 2+ calls to the public OSRM server (~1 s each);
+    // repeats of the same trip within 2 min are served instantly, then refreshed in the background.
+    return NextResponse.json({ ok: true, data: plan, ...(degraded && { degraded }) }, degraded ? undefined : { headers: { "Cache-Control": "public, s-maxage=120, stale-while-revalidate=600" } });
   } catch (err) {
     console.error("[route] routing failed:", (err as Error).message);
     return NextResponse.json({ ok: true, data: null, degraded: "Routing is unavailable right now — please try again" });
