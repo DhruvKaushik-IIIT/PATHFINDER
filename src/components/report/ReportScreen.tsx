@@ -11,6 +11,7 @@ import { shrinkPhoto } from "@/lib/images/shrink";
 import { takenAt } from "@/lib/images/takenAt";
 import { MAX_SECONDS, startRecording, type Recorder, type WavRecording } from "@/lib/audio/wavRecorder";
 
+import PickSpot, { type PickedSpot } from "./PickSpot";
 import { LAST_REPORT_KEY } from "./storage";
 
 const SLOPE_STEPS = [
@@ -30,6 +31,11 @@ const STEPS = [
 ];
 
 type Loc = { lat: number; lng: number };
+
+// Himachal's bounding box (CLAUDE.md 7.6): GPS outside it can't report on an HP road → "Pick a spot" (B1).
+const inHp = (l: Loc) => l.lat >= 30.3 && l.lat <= 33.3 && l.lng >= 75.5 && l.lng <= 79.0;
+const NO_GPS = "We couldn't get your location. Choose where your photo should go.";
+const OUTSIDE = "You seem to be outside Himachal. Pathfinder checks Himachal roads, so place your report on one.";
 
 type Mode = "photo" | "slope";
 
@@ -55,6 +61,11 @@ export default function ReportScreen() {
   const [sending, setSending] = useState(false);
   const [step, setStep] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
+  // "Pick a spot" (B1): a report placed on the map instead of at your GPS position (demo data, no points).
+  const [placed, setPlaced] = useState<PickedSpot | null>(null);
+  const [picker, setPicker] = useState<string | null>(null);
+  const [offRoad, setOffRoad] = useState(false);
+  const pending = useRef<{ photo: Blob; taken: string | null } | null>(null);
 
   // Rear camera.
   useEffect(() => {
@@ -83,10 +94,17 @@ export default function ReportScreen() {
         const here = { lat: p.coords.latitude, lng: p.coords.longitude };
         setLoc(here);
         setLocLabel("Location found (auto)");
+        if (!inHp(here)) {
+          setOffRoad(true);
+          setLocLabel("Outside Himachal · pick a spot");
+          setPicker(OUTSIDE);
+          return;
+        }
         try {
           const r = (await (await fetch(`/api/snap?lat=${here.lat}&lng=${here.lng}`)).json()) as {
-            data?: { placeName: string | null; roadRef: string | null };
+            data?: { placeName: string | null; roadRef: string | null; distanceM?: number | null };
           };
+          if (r.data && r.data.distanceM == null) setOffRoad(true);
           const parts = [r.data?.placeName && `Near ${r.data.placeName}`, r.data?.roadRef].filter(Boolean);
           if (parts.length) setLocLabel(`${parts.join(", ")} (auto)`);
         } catch {
@@ -104,7 +122,8 @@ export default function ReportScreen() {
           return;
         }
         setLocError(true);
-        setLocLabel("Turn on location to report");
+        setLocLabel("Location off · pick a spot");
+        setPicker(NO_GPS);
       },
       { enableHighAccuracy: true, timeout: 15_000, maximumAge: 30_000 },
     );
@@ -147,20 +166,24 @@ export default function ReportScreen() {
 
   useEffect(() => () => recorder.current?.cancel(), []);
 
-  async function send(photo: Blob, taken: string | null = null) {
-    if (!loc) {
-      setToast("We need your location to place the report on the road");
+  async function send(photo: Blob, taken: string | null = null, spot: PickedSpot | null = placed) {
+    // No usable GPS for a Himachal road → ask for a spot, then send this same photo.
+    if (!spot && (!loc || !inHp(loc))) {
+      pending.current = { photo, taken };
+      setPicker(loc ? OUTSIDE : NO_GPS);
       return;
     }
+    const at = spot ?? loc!;
     setSending(true);
     const form = new FormData();
     form.append("photo", photo, "photo.jpg");
-    form.append("lat", String(loc.lat));
-    form.append("lng", String(loc.lng));
+    form.append("lat", String(at.lat));
+    form.append("lng", String(at.lng));
+    if (spot) form.append("placed", "1");
     if (voice) form.append("voice", voice.blob, "note.wav");
     // Answering a scout request (/report?scout=<id> from the Alerts card): bonus points + request fulfilled.
     const scout = new URLSearchParams(window.location.search).get("scout");
-    if (scout) form.append("scout", scout);
+    if (scout && !spot) form.append("scout", scout);
     if (taken) form.append("takenAt", taken);
     if (mode === "slope") form.append("kind", "slope");
     try {
@@ -177,6 +200,16 @@ export default function ReportScreen() {
       setSending(false);
       setToast(err instanceof Error && err.message ? err.message : "Could not send the report, please try again");
     }
+  }
+
+  function pick(s: PickedSpot) {
+    setPicker(null);
+    setPlaced(s);
+    setLocError(false);
+    setLocLabel(`${s.label} · placed on map (demo)`);
+    const p = pending.current;
+    pending.current = null;
+    if (p) void send(p.photo, p.taken, s);
   }
 
   function shoot() {
@@ -209,14 +242,24 @@ export default function ReportScreen() {
         <Link href="/" className="flex h-10 items-center rounded-[20px] bg-[rgba(40,40,40,0.45)] px-4 text-[16px] font-medium text-white no-underline backdrop-blur-[20px]">
           Cancel
         </Link>
-        <span
-          className={`flex h-10 min-w-0 items-center gap-1.5 rounded-[20px] px-[14px] text-[14px] font-medium backdrop-blur-[20px] ${
-            locError ? "bg-[rgba(179,38,30,0.7)]" : "bg-[rgba(40,40,40,0.45)]"
-          }`}
-        >
-          <Navigation size={13} fill="currentColor" className="shrink-0 rotate-90" aria-hidden />
-          <span className="truncate">{locLabel}</span>
-        </span>
+        {locError || offRoad || placed ? (
+          // Location off / outside Himachal / already placed: tap to (re)pick a spot on the map (B1).
+          <button
+            type="button"
+            onClick={() => setPicker(loc && inHp(loc) ? "Place your report on a Himachal road instead of your GPS position." : loc ? OUTSIDE : NO_GPS)}
+            className={`flex h-10 min-w-0 items-center gap-1.5 rounded-[20px] px-[14px] text-[14px] font-medium text-white backdrop-blur-[20px] ${
+              locError ? "bg-[rgba(179,38,30,0.7)]" : placed ? "bg-[rgba(0,113,227,0.75)]" : "bg-[rgba(40,40,40,0.45)]"
+            }`}
+          >
+            <Navigation size={13} fill="currentColor" className="shrink-0 rotate-90" aria-hidden />
+            <span className="truncate">{locLabel}</span>
+          </button>
+        ) : (
+          <span className="flex h-10 min-w-0 items-center gap-1.5 rounded-[20px] bg-[rgba(40,40,40,0.45)] px-[14px] text-[14px] font-medium backdrop-blur-[20px]">
+            <Navigation size={13} fill="currentColor" className="shrink-0 rotate-90" aria-hidden />
+            <span className="truncate">{locLabel}</span>
+          </span>
+        )}
       </div>
 
       <p className="absolute inset-x-6 top-[130px] z-10 text-center text-[15px] font-semibold [text-shadow:0_1px_4px_rgba(0,0,0,0.5)]">
@@ -327,6 +370,21 @@ export default function ReportScreen() {
           <span className="text-[13px] text-[#D1D1D6]">Hold the mic for a note in Hindi or English</span>
         )}
       </div>
+
+      {picker && (
+        <PickSpot
+          reason={picker}
+          onPick={pick}
+          onClose={() => {
+            setPicker(null);
+            // A photo waiting for a spot: put the camera back so they can try again.
+            if (pending.current) {
+              pending.current = null;
+              void videoRef.current?.play();
+            }
+          }}
+        />
+      )}
 
       {/* sending: what the AI is doing right now */}
       {sending && (

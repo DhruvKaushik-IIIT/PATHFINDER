@@ -10,11 +10,12 @@ const HISTORY_MAX = 30;
 const SITE_COLS = "id,segment_id,road_ref,lat,lng,place_name,risk_level,risk,history,last_observed_at,last_assessed_at,created_at,is_demo";
 const OBS_COLS = "id,site_id,report_id,photo_id,reading,check,sign_metrics,created_at,is_demo,photos(public_url,annotated_url)";
 
-export async function findSite(lat: number, lng: number, segmentId: string | null): Promise<SlopeSite | null> {
+/** demoOnly: a photo placed on the map ("Pick a spot") may only join demo sites, never a real one. */
+export async function findSite(lat: number, lng: number, segmentId: string | null, demoOnly = false): Promise<SlopeSite | null> {
   const d = 0.004;
   const rows = await select<SlopeSite>(
     "slope_sites",
-    `select=${SITE_COLS}&lat=gte.${lat - d}&lat=lte.${lat + d}&lng=gte.${lng - d}&lng=lte.${lng + d}&limit=20`,
+    `select=${SITE_COLS}&lat=gte.${lat - d}&lat=lte.${lat + d}&lng=gte.${lng - d}&lng=lte.${lng + d}${demoOnly ? "&is_demo=is.true" : ""}&limit=20`,
   );
   return (
     rows

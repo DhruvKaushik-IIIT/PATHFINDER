@@ -104,7 +104,7 @@ export async function recordTap(input: {
   if (km(ev, input) > NEAR_KM) return { ok: false, code: 403, message: "You need to be near the spot to answer" };
   const life = lifecycleOf({
     type: ev.type, status: ev.status, lastConfirmedAt: ev.last_confirmed_at, reports: ev.sources?.reports, official: ev.sources?.official,
-    news: ev.sources?.news, isDemo: ev.is_demo, etaClear: ev.eta_clear, potholeSize: ev.measurements?.potholeSize, taps: ev.sources?.taps,
+    news: ev.sources?.news, isDemo: ev.is_demo, placed: Boolean((ev.sources as { placed?: boolean } | null)?.placed), etaClear: ev.eta_clear, potholeSize: ev.measurements?.potholeSize, taps: ev.sources?.taps,
   });
   if (life.state === "expired") return { ok: false, code: 410, message: "This one has already been removed" };
 

@@ -10,6 +10,7 @@ import { preparePhoto, processPhoto } from "@/lib/reports/processPhoto.ts";
 import { findDuplicate, submitReport } from "@/lib/reports/submit.ts";
 import { assessSite } from "@/lib/slope/assess.ts";
 import { submitSlopeReport } from "@/lib/slope/submit.ts";
+import { snapToRoad } from "@/lib/geo/snap.ts";
 import { roadWatchAfterChange } from "@/lib/watch/roadWatch.ts";
 import { checkLimit, limitedResponse } from "@/lib/guard/rateLimit.ts";
 
@@ -28,6 +29,8 @@ const Input = z.object({
   scout: z.uuid().optional(),
   takenAt: z.iso.datetime({ offset: true }).optional(),
   kind: z.enum(["road", "slope"]).default("road"),
+  // "Pick a spot" (B1): someone not at the spot placed the report on the map → demo data, no points.
+  placed: z.literal("1").optional(),
 });
 
 const bad = (error: string, status = 400) => NextResponse.json({ ok: false, error }, { status });
@@ -41,7 +44,7 @@ export async function POST(req: Request) {
   } catch {
     return bad("expected multipart/form-data");
   }
-  const parsed = Input.safeParse({ lat: form.get("lat"), lng: form.get("lng"), text: form.get("text") ?? undefined, scout: form.get("scout") ?? undefined, takenAt: form.get("takenAt") ?? undefined, kind: form.get("kind") ?? undefined });
+  const parsed = Input.safeParse({ lat: form.get("lat"), lng: form.get("lng"), text: form.get("text") ?? undefined, scout: form.get("scout") ?? undefined, takenAt: form.get("takenAt") ?? undefined, kind: form.get("kind") ?? undefined, placed: form.get("placed") ?? undefined });
   if (!parsed.success) return bad(`invalid input: ${parsed.error.issues.map((i) => i.path.join(".")).join(", ")}`);
   const photo = form.get("photo");
   if (!(photo instanceof File) || !photo.type.startsWith("image/")) return bad("photo (image file) is required");
@@ -79,18 +82,22 @@ export async function POST(req: Request) {
       });
     }
     const { lat, lng, text, scout, takenAt, kind } = parsed.data;
+    const placed = parsed.data.placed === "1";
+    // A placed report must sit on our Himachal road layer (that's the whole point of picking a spot).
+    if (placed && !(await snapToRoad(lat, lng)).segment) return bad("Pick a spot on a Himachal road", 422);
     const userId = await ensureUserId();
     const voiceWav = voice instanceof File ? Buffer.from(await voice.arrayBuffer()) : null;
     if (kind === "slope") {
       // Slope Sentinel: never touches road events. The risk agent runs after the response.
-      const data = await submitSlopeReport({ userId, scoutRequestId: scout ?? null, takenAt: takenAt ?? null, photo: prepared, lat, lng, text: text || null, voiceWav });
+      const data = await submitSlopeReport({ userId, placed, isDemo: placed, scoutRequestId: placed ? null : scout ?? null, takenAt: takenAt ?? null, photo: prepared, lat, lng, text: text || null, voiceWav });
       const { degraded, ...rest } = data;
       if (data.siteId) after(() => assessSite(data.siteId!, { trigger: "a new photo of this slope" }).then(() => undefined, (err: Error) => console.warn("[slope] assess failed:", err.message)));
       return NextResponse.json({ ok: true, data: rest, ...(degraded.length && { degraded: degraded.join("; ") }) });
     }
     const data = await submitReport({
       userId,
-      scoutRequestId: scout ?? null,
+      scoutRequestId: placed ? null : scout ?? null,
+      placed,
       takenAt: takenAt ?? null,
       photo: prepared,
       lat,

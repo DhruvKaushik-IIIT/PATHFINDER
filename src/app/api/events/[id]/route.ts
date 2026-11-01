@@ -64,7 +64,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     ]);
     const life = lifecycleOf({
       type: r.type, status: r.status, lastConfirmedAt: r.last_confirmed_at, reports: sources.reports, official: sources.official,
-      news: sources.news, isDemo: r.is_demo, taps: (r.sources as { taps?: Taps } | null)?.taps, etaClear: r.eta_clear, potholeSize: (measurements as { potholeSize?: string }).potholeSize,
+      news: sources.news, isDemo: r.is_demo, placed: Boolean((r.sources as { placed?: boolean } | null)?.placed), taps: (r.sources as { taps?: Taps } | null)?.taps, etaClear: r.eta_clear, potholeSize: (measurements as { potholeSize?: string }).potholeSize,
     });
     // Expired but not swept yet (or a crew is on it) → still shown as Unconfirmed.
     const lifecycle = r.resolved_at
