@@ -11,6 +11,7 @@ export const EVENT_TYPES = [
   "traffic", "accident", "closure_notice", "clear", "other",
 ] as const;
 export const STATUSES = ["open", "slow", "one_lane", "closed", "unknown"] as const;
+export const POTHOLE_SIZES = ["minor", "medium", "severe"] as const;
 
 export const Claim = z.object({
   eventType: z.enum(EVENT_TYPES),
@@ -23,6 +24,8 @@ export const Claim = z.object({
     vehiclesVisible: z.number().int().nullable(),
   }),
   crowd: z.enum(["low", "medium", "high"]).nullable(),
+  /** Potholes only (event lifecycle): minor = normal rough road, medium = cars crawl, severe = crater / half a lane. */
+  potholeSize: z.enum(POTHOLE_SIZES).nullable().optional(),
   /** True if this claim is about the spot where the photo was taken; false for other places the voice note/text mentions. */
   atReportLocation: z.boolean(),
   /** Place named in the voice note/text for claims not at the report location, e.g. "Darlaghat". */
@@ -48,6 +51,8 @@ export const Verdict = z.object({
   /** Only set when the verifier thinks the claim got it wrong. */
   correctedStatus: z.enum(STATUSES).nullable(),
   correctedEventType: z.enum(EVENT_TYPES).nullable(),
+  /** Potholes only: set when the claim's potholeSize is wrong. */
+  correctedPotholeSize: z.enum(POTHOLE_SIZES).nullable().optional(),
   reasoning: z.string(),
 });
 export type Verdict = z.infer<typeof Verdict>;

@@ -12,7 +12,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { MapRef } from "react-map-gl/maplibre";
 import Sheet from "@/components/glass/Sheet";
 import Toast from "@/components/glass/Toast";
-import { STATUS_STYLE } from "@/lib/events/types";
+import { isUnconfirmed, STATUS_STYLE, styleOf, unconfirmedLine } from "@/lib/events/types";
 import { clock, duration, VERDICT_STYLE } from "@/lib/geo/format";
 import type { RoutePlan } from "@/lib/geo/routeTypes";
 import type { WatchedTrip } from "@/lib/watch/types";
@@ -338,9 +338,10 @@ export default function RouteScreen() {
             {best.events.length > 0 ? (
               <div className="glass-card flex flex-col">
                 {best.events.map((e, i) => {
-                  const st = STATUS_STYLE[e.status] ?? STATUS_STYLE.unknown;
-                  const sub =
-                    impact.get(e.id) ??
+                  const st = styleOf(e);
+                  const sub = isUnconfirmed(e)
+                    ? `${unconfirmedLine(e)} · no delay counted`
+                    : impact.get(e.id) ??
                     `${st.word} · reach ~${clock(e.etaAt)}${e.delayMin ? ` · ~${e.delayMin} min` : ""}${e.reports ? ` · ${e.reports} report${e.reports > 1 ? "s" : ""}` : ""}`;
                   return (
                     <Link

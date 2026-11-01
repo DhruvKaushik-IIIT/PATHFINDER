@@ -1,9 +1,9 @@
 // Small glass card for a tapped pin: what, where, status word + colour, freshness, confidence.
 import { X } from "lucide-react";
-import { ago, STATUS_STYLE, TYPE_WORD, type MapEvent } from "@/lib/events/types";
+import { ago, isUnconfirmed, styleOf, TYPE_WORD, unconfirmedLine, type MapEvent } from "@/lib/events/types";
 
 export default function EventPeek({ event, onClose }: { event: MapEvent; onClose: () => void }) {
-  const st = STATUS_STYLE[event.status] ?? STATUS_STYLE.unknown;
+  const st = styleOf(event);
   const where = [event.placeName && `Near ${event.placeName}`, event.roadRef].filter(Boolean).join(" · ");
   return (
     <div role="dialog" aria-label="Road event" className="glass flex gap-3 rounded-[16px] p-3 text-ink">
@@ -28,6 +28,7 @@ export default function EventPeek({ event, onClose }: { event: MapEvent; onClose
           {event.modelsAgreed && event.modelsAgreed >= 2 ? <span>· 2 AI models agree</span> : null}
           {!event.reports && event.news ? <span>· from news, not yet confirmed</span> : null}
         </div>
+        {isUnconfirmed(event) && <span className="text-[12px] text-ink-2">{unconfirmedLine(event)} · may already be cleared</span>}
         {/* TODO(phase-2): link to /event/[id] detail */}
         <span className="text-[11px] text-ink-3">Verify with official sources</span>
       </div>

@@ -236,6 +236,8 @@ export async function runRouteCheckTool(ctx: RouteCheckContext, name: string, ra
         reports: e.reports,
         newsItems: e.news,
         summary: e.summary,
+        // Shelf life (docs/event-lifecycle.md): no recent confirmation → no delay counted, may already be cleared.
+        ...(e.lifecycle?.state === "unconfirmed" && { unconfirmed: e.lifecycle.reason ?? "no recent reports — may already be cleared" }),
       }));
     }
     case "get_event_detail": {

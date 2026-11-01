@@ -4,10 +4,11 @@
 // 3. Rules in code: cited URL only, published ≤ 72 h ago, place geocoded inside HP.
 // 4. World state: confirm a nearby open event (sources.news +1, timeline "news") or create a
 //    news-only event with capped confidence. News never closes or reopens an event on its own.
+import { mutateEvent } from "../events/mutate.ts";
 import { booleanPointInPolygon, lineString, nearestPointOnLine, point } from "@turf/turf";
 import { parseRoadNews, searchRoadNews } from "../ai/router.ts";
 import type { NewsItem } from "../ai/schemas.ts";
-import { insert, rpc, select, update } from "../db/supabase.ts";
+import { insert, rpc, select } from "../db/supabase.ts";
 import { HP_BOUNDARY } from "../geo/hpBoundary.ts";
 import { searchPlaces } from "../geo/places.ts";
 import { snapToRoad } from "../geo/snap.ts";
@@ -175,14 +176,14 @@ async function apply(item: NewsItem, at: { lat: number; lng: number; name: strin
     });
 
   if (existing) {
-    const sources = { ...existing.sources, news: (existing.sources?.news ?? 0) + 1 };
-    await update("events", `id=eq.${existing.id}`, {
-      sources,
+    // Fresh row + optimistic locking (migration 0005), so a vote or report at the same moment isn't lost.
+    await mutateEvent<typeof existing>(existing.id, "sources,confidence,last_confirmed_at", (row) => ({
+      sources: { ...row.sources, news: (row.sources?.news ?? 0) + 1 },
       // News is a weak, independent confirmation; it never moves the status (travellers/officials do).
       // News alone can't make an event look traveller-verified.
-      confidence: Math.min(existing.sources?.reports || existing.sources?.official ? 0.97 : 0.65, 1 - (1 - existing.confidence) * (1 - 0.15 * item.confidence)),
-      last_confirmed_at: publishedAt > existing.last_confirmed_at ? publishedAt : existing.last_confirmed_at,
-    });
+      confidence: Math.min(row.sources?.reports || row.sources?.official ? 0.97 : 0.65, 1 - (1 - row.confidence) * (1 - 0.15 * item.confidence)),
+      last_confirmed_at: publishedAt > row.last_confirmed_at ? publishedAt : row.last_confirmed_at,
+    }));
     await timeline(
       existing.id,
       item.reopened ? `News says reopened — awaiting a traveller or official confirmation: ${item.summary}` : `In the news: ${item.summary}`,

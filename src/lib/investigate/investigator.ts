@@ -3,10 +3,12 @@
 // Code decides what that changes: confidence moves at most ±0.15 per run, the STATUS never changes
 // (only new evidence — a photo, an official update, a news item — does that), a suspected change is
 // flagged on the timeline and turned into a scout photo request.
+import { mutateEvent } from "../events/mutate.ts";
+import type { Taps } from "../events/lifecycle.ts";
 import { groundedSearch, investigate } from "../ai/router.ts";
 import { ist } from "../ai/tools/routeCheck.ts";
 import { runInvestigateTool, type InvestigatedEvent, type InvestigateContext } from "../ai/tools/investigate.ts";
-import { insert, select, update } from "../db/supabase.ts";
+import { insert, select } from "../db/supabase.ts";
 import { dispatchRequest, type ScoutRequest } from "../scout/requests.ts";
 import { eventTitle, type InvestigationSummary } from "../events/types.ts";
 
@@ -145,7 +147,21 @@ export async function investigateEvent(id: string, opts: { force?: boolean } = {
     data: { ...note, reason, trace: res.data.trace, title: eventTitle(ev.type, ev.place_name) },
     is_demo: ev.is_demo ?? false,
   });
-  if (after !== ev.confidence) await update("events", `id=eq.${ev.id}`, { confidence: after });
+  // Part C (docs/event-lifecycle.md §4): cited news says it reopened → Unconfirmed at once (no delay on routes).
+  // The Investigator still never closes or changes the status; shelf life / taps / a photo decide that.
+  const newsSaysOpen =
+    f && ctx.citedUrls.size > 0 && (f.finding === "likely_cleared" || (f.finding === "likely_changed" && f.suggestedStatus === "open"));
+  // Applied to the fresh row (optimistic locking): the confidence STEP, not an absolute value, so votes
+  // or reports that landed during the ~10–20 s AI run aren't overwritten.
+  const step = after - ev.confidence;
+  if (newsSaysOpen || step) {
+    await mutateEvent<{ confidence: number; sources: { taps?: Taps } | null }>(ev.id, "confidence,sources", (row) => ({
+      confidence: Math.round(Math.max(0.15, Math.min(newsOnly(ev) ? NEWS_ONLY_CAP : 0.97, row.confidence + step)) * 1000) / 1000,
+      ...(newsSaysOpen && {
+        sources: { ...row.sources, taps: { ...row.sources?.taps, doubtAt: new Date().toISOString(), doubtReason: "Recent news says the road has reopened (AI check)" } },
+      }),
+    }));
+  }
   if (ctx.scoutRequestId) {
     const [req] = await select<ScoutRequest>("scout_requests", `select=id,segment_id,question,demand_count,sent_to,fulfilled_by_report_id,created_at,is_demo&id=eq.${ctx.scoutRequestId}`);
     if (req) await dispatchRequest(req).catch((err: Error) => console.warn("[investigate] scout dispatch failed:", err.message));

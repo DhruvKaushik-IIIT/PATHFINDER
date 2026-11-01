@@ -1,6 +1,6 @@
 // Server-only: the "data version" (Nov 1 sync fix). It changes the moment road data changes anywhere:
 // an event confirmed/updated (reports, field updates, news merges all bump last_confirmed_at), an event
-// resolved, a crew sent / arriving / done, or a field update posted. Screens put it in their data URLs
+// resolved, a crew sent / arriving / done, a field update posted, or any timeline row (votes, passes, AI checks). Screens put it in their data URLs
 // (`&v=…`), so the CDN and in-memory caches keep answers only while nothing has changed — fast AND in sync.
 import { select } from "../db/supabase.ts";
 
@@ -24,6 +24,8 @@ export async function dataVersion(): Promise<string> {
     newest("crews", "arrived_at"),
     newest("crews", "done_at"),
     newest("crews", "acknowledged_at"),
+    // Every vote, Drive Watch pass, news merge and AI check adds a timeline row → caches refresh at once.
+    newest("event_timeline", "at"),
   ])
     .then((ts) => {
       const v = Math.max(...ts).toString(36);

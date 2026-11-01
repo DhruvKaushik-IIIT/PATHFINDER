@@ -117,7 +117,8 @@ async function analyse(
   let delaySoFar = 0;
   const events: RouteEvent[] = onRoute.map(({ e, np }, order) => {
     const segIdx = Math.min(np.properties.index ?? 0, cumS.length - 1);
-    const harmless = e.type === "clear" || e.status === "open";
+    // Unconfirmed (past half its shelf life) → shown, but no delay and never blocks (docs/event-lifecycle.md).
+    const harmless = e.type === "clear" || e.status === "open" || e.lifecycle?.state === "unconfirmed";
     const delayMin = harmless ? 0 : (DELAY_MIN[e.status] ?? 0);
     const etaAt = new Date(ctx.departAt.getTime() + (cumS[segIdx]! + delaySoFar * 60) * 1000).toISOString();
     delaySoFar += delayMin;

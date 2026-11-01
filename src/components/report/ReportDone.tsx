@@ -139,7 +139,7 @@ export default function ReportDone() {
             </span>
             <span className="text-[14px] text-ink-2">
               {accepted
-                ? `Now on the map for travellers${road ? ` on ${road}` : ""}`
+                ? (result.timeCheck ?? `Now on the map for travellers${road ? ` on ${road}` : ""}`)
                 : rejected
                   ? "It doesn't look like a road condition — try another angle"
                   : (result.timeCheck ?? "We'll add it once another report or the AI confirms it")}
