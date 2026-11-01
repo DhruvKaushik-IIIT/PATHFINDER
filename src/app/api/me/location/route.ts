@@ -6,6 +6,7 @@ import { z } from "zod";
 import { hasDb, select, update } from "@/lib/db/supabase.ts";
 import { currentUserId } from "@/lib/me.ts";
 import { dispatchForUser } from "@/lib/scout/requests.ts";
+import { askStillThereForUser } from "@/lib/scout/stillThere.ts";
 
 export const dynamic = "force-dynamic";
 
@@ -28,7 +29,10 @@ export async function POST(req: Request) {
   await update("users", `id=eq.${id}`, { ...loc, coarse_updated_at: new Date().toISOString() });
   if (u.scout_opt_in) {
     after(() =>
-      dispatchForUser({ id, ...loc }).catch((err: Error) => console.warn("[scout] dispatch on ping failed:", err.message)),
+      dispatchForUser({ id, ...loc })
+        // No photo request for them → maybe a one-tap "Still there?" (≤20 km/h, same 2-a-day budget).
+        .then((sent) => (sent ? null : askStillThereForUser({ id, ...loc })))
+        .catch((err: Error) => console.warn("[scout] dispatch on ping failed:", err.message)),
     );
   }
   return NextResponse.json({ ok: true, data: { stored: true } });

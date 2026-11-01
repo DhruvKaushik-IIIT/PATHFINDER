@@ -21,6 +21,7 @@ import { fetchSlopes } from "@/components/map/useSlopes";
 import type { SlopePin } from "@/lib/slope/types";
 import { cumulative, pointAt, project, type Coord } from "@/lib/drive/line";
 import { STATUS_STYLE, type EventStatus, type MapEvent } from "@/lib/events/types";
+import StillThere, { answeredRecently, type TapEvent } from "@/components/event/StillThere";
 import { clock } from "@/lib/geo/format";
 import type { RoutePlan } from "@/lib/geo/routeTypes";
 import { eventTitle, loadCheck } from "@/components/route/routeData";
@@ -82,6 +83,14 @@ export default function DriveScreen() {
   const [banner, setBanner] = useState<Banner | null>(null);
   const [follow, setFollow] = useState(true);
   const wake = useWakeLock(videoRef);
+  // "Still there?" (docs/event-lifecycle.md §2): spots you passed, asked once you're ≤20 km/h (or at End drive).
+  const [askQueue, setAskQueue] = useState<(TapEvent & { lat: number; lng: number })[]>([]);
+  const [slowEnough, setSlowEnough] = useState(false);
+  const [ending, setEnding] = useState(false);
+  const asked = useRef(new Set<string>());
+  const lastFix = useRef<{ t: number; lat: number; lng: number } | null>(null);
+  const speedKmh = useRef<number | null>(null);
+  const startKm = useRef<number | null>(null); // only spots you actually drove past count
 
   const announced = useRef(new Set<string>());
   const known = useRef(new Map<string, Hazard>());
@@ -126,6 +135,14 @@ export default function DriveScreen() {
       return { id: e.id, type: e.type, status: e.status, placeName: e.placeName, roadRef: e.roadRef, lat: e.lat, lng: e.lng, alongKm: p.alongKm, offKm: p.offKm };
     },
     [line, cum],
+  );
+  // Every issue on the chosen route, including Unconfirmed ones (those need an answer most).
+  const askable = useMemo(
+    () =>
+      (route?.events ?? [])
+        .filter((e) => e.status !== "open" && e.type !== "clear")
+        .map((e) => ({ id: e.id, type: e.type, status: e.status, placeName: e.placeName, lat: e.lat, lng: e.lng, alongKm: project(line, cum, [e.lng, e.lat]).alongKm })),
+    [route, line, cum],
   );
   const onRoute = useCallback(
     (h: { id: string; offKm: number; roadRef: string | null }) => {
@@ -198,9 +215,28 @@ export default function DriveScreen() {
 
   // Position → along-route km → hazard alerts.
   const onPosition = useCallback(
-    (lat: number, lng: number) => {
+    (lat: number, lng: number, speedMs?: number | null) => {
       if (line.length < 2) return;
       const p = project(line, cum, [lng, lat]);
+      // Speed: the GPS's own reading, else from the last two fixes.
+      const now = Date.now();
+      const prev = lastFix.current;
+      if (speedMs != null) speedKmh.current = speedMs * 3.6;
+      else if (prev && now - prev.t >= 2000) {
+        const d = Math.hypot((lng - prev.lng) * 111.32 * Math.cos((lat * Math.PI) / 180), (lat - prev.lat) * 110.57);
+        speedKmh.current = d / ((now - prev.t) / 3_600_000);
+      }
+      if (!prev || now - prev.t >= 2000) lastFix.current = { t: now, lat, lng };
+      setSlowEnough(!simulate && speedKmh.current != null && speedKmh.current <= 20);
+      // Spots passed since you started (and within the last 15 km) → ask "Still there?" once.
+      if (startKm.current == null && p.offKm <= OFF_ROUTE_KM) startKm.current = p.alongKm;
+      const passed = askable.filter(
+        (e) => startKm.current != null && e.alongKm > startKm.current && e.alongKm < p.alongKm - 0.3 && e.alongKm > p.alongKm - 15 && !asked.current.has(e.id) && !answeredRecently(e.id),
+      );
+      if (passed.length) {
+        for (const e of passed) asked.current.add(e.id);
+        setAskQueue((q) => [...q, ...passed]);
+      }
       meKm.current = p.alongKm;
       setMe({ lat, lng, km: p.alongKm, offKm: p.offKm });
       if (p.offKm > OFF_ROUTE_KM) return; // off the planned road: distances would be wrong
@@ -214,7 +250,7 @@ export default function DriveScreen() {
         show({ status: "slope", title: "Slope Sentinel", text: main, sub: l === "hi" ? en : undefined, roadWatch: false, slope: true }, `${main}\u0000${en}`);
       }
     },
-    [line, cum, announce, show],
+    [line, cum, announce, show, askable, simulate],
   );
 
   // GPS (or the simulated track) while driving.
@@ -237,7 +273,7 @@ export default function DriveScreen() {
       return;
     }
     const id = navigator.geolocation.watchPosition(
-      (pos) => onPosition(pos.coords.latitude, pos.coords.longitude),
+      (pos) => onPosition(pos.coords.latitude, pos.coords.longitude, pos.coords.speed),
       (err) => setToast(err.code === 1 ? "Allow location to use Drive Watch" : "Waiting for GPS…"),
       { enableHighAccuracy: true, maximumAge: 5_000, timeout: 20_000 },
     );
@@ -328,6 +364,7 @@ export default function DriveScreen() {
     if (!muted) speak(lang === "hi" && hasHindiVoice() ? "ड्राइव वॉच चालू" : "Drive Watch on", lang === "hi" && hasHindiVoice() ? "hi" : "en");
     wake.start();
     announced.current.clear();
+    startKm.current = null;
     setFollow(true);
     setStarted(true);
   }
@@ -336,8 +373,26 @@ export default function DriveScreen() {
     window.speechSynthesis?.cancel();
     wake.stop();
     setStarted(false);
-    router.push(`/route?${routeQuery}`);
+    // Spots you passed and weren't asked about yet → ask now (you've stopped), then leave.
+    if (askQueue.length) {
+      setBanner(null);
+      setEnding(true);
+    }
+    else router.push(`/route?${routeQuery}`);
   }
+  const nextAsk = askQueue[0];
+  // While driving, a hazard banner wins; after End drive the questions come first.
+  const showAsk = Boolean(nextAsk && (ending || (slowEnough && !banner)));
+  const askDone = useCallback(
+    (r: { message: string } | null) => {
+      if (r) setToast(r.message);
+      setAskQueue((q) => q.slice(1));
+    },
+    [],
+  );
+  useEffect(() => {
+    if (ending && !askQueue.length) router.push(`/route?${routeQuery}`);
+  }, [ending, askQueue.length, router, routeQuery]);
 
   const ahead = hazards.filter((h) => h.alongKm - (me?.km ?? 0) > -0.3).sort((a, b) => a.alongKm - b.alongKm);
   const next = ahead[0];
@@ -404,6 +459,26 @@ export default function DriveScreen() {
           </button>
         )}
       </div>
+
+      {showAsk && nextAsk && (
+        <div className="absolute inset-x-[14px] z-20 mx-auto max-w-[452px]" style={{ top: 104 }}>
+          <StillThere
+            key={nextAsk.id}
+            event={nextAsk}
+            lang={lang}
+            autoHideS={ending ? undefined : 20}
+            // Simulated drive: answer as if at the spot (demo only, labelled SIMULATED).
+            position={() =>
+              simulate
+                ? { lat: nextAsk.lat, lng: nextAsk.lng, speedKmh: 0 }
+                : me
+                  ? { lat: me.lat, lng: me.lng, speedKmh: speedKmh.current }
+                  : null
+            }
+            onDone={askDone}
+          />
+        </div>
+      )}
 
       {started && !follow && (
         <div className="absolute right-[14px] z-10" style={{ bottom: 440 }}>

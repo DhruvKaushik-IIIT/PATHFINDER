@@ -1,7 +1,7 @@
 // Server-only: open (unresolved) events in a bounding box, shaped for the map and the route planner.
 import { select } from "../db/supabase.ts";
 import type { EventStatus, MapEvent } from "./types.ts";
-import { lifecycleOf } from "./lifecycle.ts";
+import { lifecycleOf, type Taps } from "./lifecycle.ts";
 import { maybeSweepExpired } from "./expire.ts";
 
 export interface EventRow {
@@ -14,7 +14,7 @@ export interface EventRow {
   summary: string | null;
   confidence: number;
   last_confirmed_at: string;
-  sources: { reports?: number; official?: number; news?: number } | null;
+  sources: { reports?: number; official?: number; news?: number; taps?: Taps } | null;
   models_agreed: number | null;
   eta_clear: { earliest: string; latest: string } | null;
   road_segments: { road_ref: string | null; road_name: string | null } | null;
@@ -47,7 +47,7 @@ export function toMapEvent(r: EventRow): MapEvent {
   const life = lifecycleOf({
     type: r.type, status: r.status, lastConfirmedAt: r.last_confirmed_at, reports: r.sources?.reports,
     official: r.sources?.official, news: r.sources?.news, isDemo: r.is_demo, etaClear: r.eta_clear,
-    potholeSize: r.measurements?.potholeSize ?? null,
+    potholeSize: r.measurements?.potholeSize ?? null, taps: r.sources?.taps,
   });
   return {
     id: r.id,

@@ -113,7 +113,7 @@ async function scoutsNear(p: { lat: number; lng: number }): Promise<ScoutUser[]>
   );
 }
 
-async function sentToday(userId: string): Promise<number> {
+export async function sentToday(userId: string): Promise<number> {
   const since = new Date(Date.now() - 24 * 3_600_000).toISOString();
   const rows = await select<{ id: string }>("alerts", `select=id&user_id=eq.${userId}&kind=eq.scout_request&created_at=gte.${since}&limit=${MAX_PER_DAY}`);
   return rows.length;

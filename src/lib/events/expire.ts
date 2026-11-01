@@ -3,7 +3,7 @@
 // Vercel Hobby crons are daily and a traffic jam only lives 6 hours.
 import { after } from "next/server.js";
 import { insert, select, update } from "../db/supabase.ts";
-import { lifecycleOf } from "./lifecycle.ts";
+import { lifecycleOf, type Taps } from "./lifecycle.ts";
 
 interface Row {
   id: string;
@@ -12,7 +12,7 @@ interface Row {
   lat: number;
   lng: number;
   last_confirmed_at: string;
-  sources: { reports?: number; official?: number; news?: number } | null;
+  sources: { reports?: number; official?: number; news?: number; taps?: Taps } | null;
   eta_clear: { earliest: string; latest: string } | null;
   measurements: { potholeSize?: string | null } | null;
 }
@@ -54,7 +54,7 @@ export async function sweepExpired(): Promise<SweepResult> {
       r,
       life: lifecycleOf({
         type: r.type, status: r.status, lastConfirmedAt: r.last_confirmed_at, reports: r.sources?.reports,
-        official: r.sources?.official, news: r.sources?.news, etaClear: r.eta_clear, potholeSize: r.measurements?.potholeSize,
+        official: r.sources?.official, news: r.sources?.news, etaClear: r.eta_clear, potholeSize: r.measurements?.potholeSize, taps: r.sources?.taps,
       }),
     }))
     .filter((x) => x.life.state === "expired");

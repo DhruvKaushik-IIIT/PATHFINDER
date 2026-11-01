@@ -4,7 +4,7 @@
 // daily spend cap in lib/ai/budget.ts, which every AI call checks.
 import { NextResponse } from "next/server.js"; // .js so plain-node tests can import this file
 
-export type Bucket = "report" | "route" | "nearby" | "investigate" | "fit" | "image" | "slope" | "official" | "login";
+export type Bucket = "report" | "route" | "nearby" | "investigate" | "fit" | "image" | "slope" | "official" | "login" | "tap";
 
 /** [max per minute, max per hour] — per IP and, separately, per device (pf_uid cookie). */
 export const LIMITS: Record<Bucket, [number, number]> = {
@@ -17,10 +17,11 @@ export const LIMITS: Record<Bucket, [number, number]> = {
   slope: [2, 12],
   official: [6, 60], // officials: dispatch agent, advisory, field-update photo checks
   login: [8, 40], // official sign-in (password guessing), not AI
+  tap: [6, 30], // "Still there?" one-tap answers (no AI; 1 per event per 6 h is enforced separately)
 };
 const WORD: Record<Bucket, string> = {
   report: "reports", route: "route checks", nearby: "area summaries", investigate: "AI checks", fit: "vehicle checks",
-  image: "alert cards", slope: "slope checks", official: "AI actions", login: "sign-in attempts",
+  image: "alert cards", slope: "slope checks", official: "AI actions", login: "sign-in attempts", tap: "answers",
 };
 
 const hits = new Map<string, { minute: number; m: number; hour: number; h: number }>();

@@ -14,6 +14,17 @@ export interface Lifecycle {
   reason: string | null;
 }
 
+/** "Still there?" taps (docs/event-lifecycle.md §2), stored in events.sources.taps. */
+export interface Taps {
+  /** Last Yes: when, and the shelf-life factor its answer gave (worse 1.5 · same 1 · partly 0.5 · almost clear 0.25). */
+  at?: string;
+  factor?: number;
+  /** Last "No, it's gone". */
+  noAt?: string;
+  /** No votes since the last full Yes: device, time, weight (No = 1, Almost clear = 0.5). */
+  nos?: { d: string; at: string; w: number }[];
+}
+
 export interface LifecycleInput {
   type: string;
   status: string;
@@ -24,6 +35,7 @@ export interface LifecycleInput {
   isDemo?: boolean | null;
   etaClear?: { earliest: string; latest: string } | null;
   potholeSize?: string | null;
+  taps?: Taps | null;
 }
 
 const H = 1;
@@ -68,6 +80,9 @@ export function lifecycleOf(e: LifecycleInput, now = Date.now()): Lifecycle {
   let life = shelfLifeH(e.type, e.status, e.potholeSize);
   // News-only (no photo, no official update) is weaker evidence: half the shelf life.
   if ((e.reports ?? 0) === 0 && (e.official ?? 0) === 0 && (e.news ?? 0) > 0) life /= 2;
+  // A "Still there? Yes" tap confirmed it last → its answer scales the shelf life (a later photo resets to 1).
+  const t = e.taps;
+  if (t?.at && t.factor && new Date(t.at).getTime() >= last - 60_000) life *= t.factor;
   let expires = last + life * 3_600_000;
   // A closure notice lasts until its own end date when it has one.
   if (e.type === "closure_notice" && e.etaClear?.latest) expires = Math.max(expires, new Date(e.etaClear.latest).getTime());
@@ -78,6 +93,12 @@ export function lifecycleOf(e: LifecycleInput, now = Date.now()): Lifecycle {
   if (promised && promised > last && promised < unconfirmed) {
     unconfirmed = promised;
     reason = "Expected to reopen by now · no new report since";
+  }
+  // "No, it's gone" after the last confirmation → Unconfirmed straight away.
+  const noAt = t?.noAt ? new Date(t.noAt).getTime() : null;
+  if (noAt && noAt > last + 60_000 && noAt < unconfirmed) {
+    unconfirmed = noAt;
+    reason = "A traveller passing by said it's gone";
   }
   const sinceH = (now - last) / 3_600_000;
   const state: LifecycleState = now >= expires ? "expired" : now >= unconfirmed ? "unconfirmed" : "active";

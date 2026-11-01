@@ -1,5 +1,6 @@
 // pnpm test:lifecycle — shelf life rules (docs/event-lifecycle.md). No AI, no network.
 import { lifecycleOf, shelfLifeH } from "../src/lib/events/lifecycle.ts";
+import { applyTap, noWeight } from "../src/lib/events/stillThere.ts";
 
 let fail = 0;
 const check = (name: string, ok: boolean, info = "") => {
@@ -49,6 +50,36 @@ check("reopening time still ahead → active", etaFuture.state === "active");
 // Closure notice runs to its own end date
 const notice = state({ type: "closure_notice", status: "closed", reports: 0, official: 1, lastConfirmedAt: hAgo(100), etaClear: { earliest: hAgo(-10), latest: hAgo(-20) } });
 check("closure notice until its end date (100 h old, ends in 20 h) → not expired", notice.state !== "expired", notice.state);
+
+// "Still there?" taps
+const iso = (h: number) => new Date(NOW - h * 3_600_000).toISOString();
+const base = { type: "landslide", status: "one_lane", reports: 1 }; // 48 h shelf life
+const yes = (answer: "worse" | "same" | "partly" | "almost_clear", at = 0) => applyTap(undefined, 0.8, answer, "dev1", NOW - at * 3_600_000);
+const same = yes("same");
+check("Yes · same → confirms, confidence +0.05", same.confirms && Math.abs(same.confidence - 0.85) < 1e-9);
+const lifeOf = (answer: "worse" | "same" | "partly" | "almost_clear") =>
+  lifecycleOf({ ...base, lastConfirmedAt: iso(0), taps: yes(answer).taps }, NOW).shelfLifeH;
+check("worse → 1.5× shelf life (72 h)", lifeOf("worse") === 72);
+check("same → full shelf life (48 h)", lifeOf("same") === 48);
+check("partly cleared → half (24 h)", lifeOf("partly") === 24);
+check("almost clear → quarter (12 h)", lifeOf("almost_clear") === 12);
+const later = lifecycleOf({ ...base, lastConfirmedAt: iso(0), taps: yes("partly", 5).taps }, NOW);
+check("a newer photo report resets the factor", later.shelfLifeH === 48);
+const no1 = applyTap(undefined, 0.8, "gone", "dev1", NOW - 60_000 * 5);
+check("No → confidence −0.1, not a confirmation", !no1.confirms && Math.abs(no1.confidence - 0.7) < 1e-9);
+const afterNo = lifecycleOf({ ...base, lastConfirmedAt: iso(3), taps: no1.taps }, NOW);
+check("1 No → Unconfirmed at once", afterNo.state === "unconfirmed" && /said it's gone/.test(afterNo.reason ?? ""), afterNo.reason ?? "");
+const no2 = applyTap(no1.taps, 0.7, "gone", "dev2", NOW - 60_000 * 3);
+const no2same = applyTap(no2.taps, 0.6, "gone", "dev2", NOW - 60_000 * 2);
+check("same device twice counts once", noWeight(no2same.taps.nos, NOW).devices === 2 && noWeight(no2same.taps.nos, NOW).weight === 2);
+const no3 = applyTap(no2.taps, 0.6, "gone", "dev3", NOW - 60_000);
+check("3 Nos from 3 devices → weight 3 (closes early)", noWeight(no3.taps.nos, NOW).weight === 3);
+const yesAfter = applyTap(no2.taps, 0.6, "same", "dev3", NOW - 60_000);
+check("a full Yes cancels earlier Nos", noWeight(yesAfter.taps.nos, NOW).weight === 0);
+const almost = applyTap(no2.taps, 0.6, "almost_clear", "dev3", NOW - 60_000);
+check("almost clear = ½ No, earlier Nos kept (2.5)", noWeight(almost.taps.nos, NOW).weight === 2.5);
+const oldNos = applyTap({ nos: [{ d: "a", at: iso(7), w: 1 }, { d: "b", at: iso(7), w: 1 }] }, 0.6, "gone", "c", NOW);
+check("Nos older than 6 h don't count", noWeight(oldNos.taps.nos, NOW).weight === 1);
 
 console.log(fail ? `\n${fail} failed` : "\nall passed");
 process.exit(fail ? 1 : 0);

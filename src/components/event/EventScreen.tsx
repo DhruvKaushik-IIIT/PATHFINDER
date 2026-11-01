@@ -15,6 +15,7 @@ import CrewCard from "@/components/repairs/CrewCard";
 import SiteNote from "@/components/repairs/SiteNote";
 import ModelChecks from "@/components/verification/ModelChecks";
 import SheetMessage from "@/components/glass/SheetMessage";
+import { StillThereNearby } from "@/components/event/StillThere";
 import type { Repair } from "@/lib/repairs/types";
 
 const MapView = dynamic(() => import("@/components/map/MapView"), {
@@ -132,6 +133,9 @@ export default function EventScreen({ id }: { id: string }) {
                 </span>
               </div>
             )}
+
+            {/* "Still there?" — only for phones within 2 km of the spot (docs/event-lifecycle.md §2) */}
+            {!ev.resolvedAt && <StillThereNearby event={ev} lat={ev.lat} lng={ev.lng} />}
 
             {/* evidence photo (AI-annotated, faces/plates blurred) */}
             {photo ? (

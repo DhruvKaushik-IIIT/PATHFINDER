@@ -9,7 +9,7 @@ import type { InvestigatedEvent } from "@/lib/ai/tools/investigate.ts";
 import { lastInvestigation, whyInvestigate } from "@/lib/investigate/investigator.ts";
 import { eventVerification } from "@/lib/verification/stats.ts";
 import type { EventDetail, EventStatus } from "@/lib/events/types.ts";
-import { lifecycleOf } from "@/lib/events/lifecycle.ts";
+import { lifecycleOf, type Taps } from "@/lib/events/lifecycle.ts";
 
 export const dynamic = "force-dynamic";
 
@@ -64,7 +64,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     ]);
     const life = lifecycleOf({
       type: r.type, status: r.status, lastConfirmedAt: r.last_confirmed_at, reports: sources.reports, official: sources.official,
-      news: sources.news, isDemo: r.is_demo, etaClear: r.eta_clear, potholeSize: (measurements as { potholeSize?: string }).potholeSize,
+      news: sources.news, isDemo: r.is_demo, taps: (r.sources as { taps?: Taps } | null)?.taps, etaClear: r.eta_clear, potholeSize: (measurements as { potholeSize?: string }).potholeSize,
     });
     // Expired but not swept yet (or a crew is on it) → still shown as Unconfirmed.
     const lifecycle = r.resolved_at

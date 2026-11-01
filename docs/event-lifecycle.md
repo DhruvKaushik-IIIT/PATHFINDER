@@ -1,6 +1,6 @@
 # Event lifecycle: shelf life, "Still there?", auto-close
 
-> Design agreed with Dhruv on Nov 1, 2026. Part A built Nov 1 (see bottom); B and C not yet.
+> Design agreed with Dhruv on Nov 1, 2026. Parts A and B built Nov 1 (see bottom); C not yet.
 
 ## Why
 Pathfinder is not yet used by PWD, so nobody may tell us when a road is cleared.
@@ -107,7 +107,7 @@ If the Investigator finds news that the road reopened → the event goes straigh
 | Part | Content | Status |
 |---|---|---|
 | A | Shelf life, Unconfirmed state, auto-close, pothole sizes | ✅ Nov 1 |
-| B | "Still there?" taps | ⬜ |
+| B | "Still there?" taps | ✅ Nov 1 |
 | C | Drive Watch passing traffic + Investigator news → Unconfirmed | ⬜ |
 
 ## Part A — how it was built (Nov 1)
@@ -119,3 +119,15 @@ If the Investigator finds news that the road reopened → the event goes straigh
 - Verifier: merges into any open event still within its shelf life (was: 24 h window); an expired one is closed first and the report starts a fresh event. Real reports still merge into demo events (no duplicate pins).
 - Potholes: `potholeSize` in Claim (claim-v3) + `correctedPotholeSize` in Verdict (verify-v3), optional fields. minor → no event (report accepted, "/report/done" says "saved as a rough-road note"); medium → slow; severe → one lane; stored in `events.measurements.potholeSize`. The rough-road note lives only in the report's claim for now (not drawn on the map).
 - No schema change, no AI cost.
+
+## Part B — how it was built (Nov 1)
+- **Storage (no schema change):** `events.sources.taps` = `{at, factor, noAt, nos:[{d, at, w}]}` (`Taps` in `lifecycle.ts`).
+  A Yes sets `last_confirmed_at = now` + `factor` (worse 1.5 · same 1 · partly 0.5 · almost clear 0.25); `lifecycleOf` scales the shelf life by it only while that tap is the latest confirmation (a later photo resets to ×1).
+  A No sets `noAt` → Unconfirmed at once ("A traveller passing by said it's gone"); confidence +0.05 per Yes, −0.1 per No (floor 0.15).
+  Each tap = timeline line (kind report, actor "Traveller (one tap)", `data.tapBy` = device id) → also the 1-per-device-per-6-h check.
+- **Close early:** No-weight ≥ 3 within 6 h (one per device, its heaviest; No = 1, Almost clear = ½; a full Yes clears earlier Nos) → `closeExpired` "Closed early: 3 travellers passing by said it's gone" + Road Watch. Demo events record taps but never close.
+- **API:** `POST /api/events/[id]/still-there {answer, lat, lng, speedKmh?}` (`lib/events/stillThere.ts`): 410 removed · 422 > 20 km/h · 403 > 2 km from the spot · 409 already answered; rate limit bucket `tap` [6/min, 30/h].
+- **UI:** `components/event/StillThere.tsx` (2-step multiple choice, buttons ≥56 px, EN/हिन्दी from `pf:lang`, "Didn't see it" = no vote, safety line). `StillThereNearby` on the event page (and in alerts): quietly checks location if already allowed, else a "Near this spot?" link; shown only within 2 km and not answered in 6 h (localStorage `pf:tap:<id>`).
+- **Drive Watch:** every issue on the chosen route incl. Unconfirmed ones; spots passed since you started (≤15 km back) are queued; asked when GPS speed ≤ 20 km/h (GPS speed, else from fixes) and no hazard banner; auto-hides after 20 s; at **End drive** the remaining questions are asked first, then back to /route. Simulate mode asks at End drive (answers as if at the spot, labelled SIMULATED).
+- **Alerts:** `lib/scout/stillThere.ts` on a scout's location ping (`/api/me/location`, only when no photo request was sent): opted-in, location on, ≤20 km/h, shares the 2-a-day Scout budget; event within ~2.5 km, Unconfirmed first, else ≥¼ into its shelf life; never the same event twice; demo events only for demo users. Alert kind `scout_request` with `data.stillThere` → inline card in /alerts.
+- **Tests:** `pnpm test:lifecycle` (32 checks incl. 12 for taps). HTTP e2e on throwaway events: Yes·partly → confirmed now, shelf life 24 h; 1 No → Unconfirmed; same device again → 409; 3rd device's No → closed early + timeline; far → 403, 45 km/h → 422, removed → 410; alert: 40 km/h → none, stopped → asked, again → none. Screenshots: event page card (both steps), Drive Watch End-drive card, /alerts card. Test rows marked is_demo.

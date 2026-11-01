@@ -10,7 +10,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Sheet from "@/components/glass/Sheet";
 import Toast from "@/components/glass/Toast";
-import { ago } from "@/lib/events/types";
+import { ago, type EventStatus } from "@/lib/events/types";
+import { StillThereNearby } from "@/components/event/StillThere";
 import { VERDICT_STYLE } from "@/lib/geo/format";
 import { routeUrl, type Alert, type WatchedTrip } from "@/lib/watch/types";
 
@@ -131,7 +132,15 @@ export default function AlertsScreen() {
                       {a.data.hi}
                     </span>
                   )}
-                  {a.kind === "scout_request" ? (
+                  {a.data?.stillThere && a.data.eventId && a.data.lat != null && a.data.lng != null ? (
+                    // One-tap answer right here (only works within 2 km of the spot).
+                    <StillThereNearby
+                      event={{ id: a.data.eventId, type: a.data.type ?? "other", status: (a.data.status ?? "unknown") as EventStatus, placeName: a.data.placeName ?? null }}
+                      lat={a.data.lat}
+                      lng={a.data.lng}
+                      label="Answer: still there?"
+                    />
+                  ) : a.kind === "scout_request" ? (
                     <div className="flex gap-2">
                       {a.data?.url && (
                         <Link

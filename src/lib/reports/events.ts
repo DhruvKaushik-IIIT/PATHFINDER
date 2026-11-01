@@ -6,7 +6,7 @@ import type { Claim, Verdict } from "../ai/schemas.ts";
 import { debrisVolumeM3, type Range } from "../clearing/estimate.ts";
 import { insert, select, update } from "../db/supabase.ts";
 import type { VerificationRecord } from "../verification/types.ts";
-import { lifecycleOf } from "../events/lifecycle.ts";
+import { lifecycleOf, type Taps } from "../events/lifecycle.ts";
 import { closeExpired } from "../events/expire.ts";
 
 const NEAR_DEG = 0.003; // ~300 m box when the report could not be snapped to a segment
@@ -74,7 +74,7 @@ async function findOpenEvent(u: EventUpdate): Promise<EventRow | null> {
   const life = lifecycleOf({
     type: row.type, status: row.status, lastConfirmedAt: row.last_confirmed_at, reports: row.sources?.reports,
     official: row.sources?.official, news: row.sources?.news, etaClear: row.eta_clear, potholeSize: row.measurements?.potholeSize,
-    isDemo: row.is_demo,
+    isDemo: row.is_demo, taps: (row.sources as { taps?: Taps } | null)?.taps,
   });
   if (life.state === "expired") {
     await closeExpired([{ id: row.id, reason: life.reason }]).catch(() => {});
