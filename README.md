@@ -73,7 +73,8 @@ flowchart LR
 
 - **Traveller:** open the live link → search "Manali" → Directions → Start / Drive Watch. Add `&simulate=1` to the `/drive` URL to replay the drive and hear the alerts; add `&replay=1` to `/route` or `/nearby` to replay a real monsoon day's rain.
 - **Report:** tap Report → take or choose a road photo (or Slope for a hillside), optionally hold the mic for a Hindi note.
-- **Officials (demo):** `/official/login` → **Try as PWD Mandi (demo)** (or Department ID `PWD-MANDI-DEMO`, password `himachal-demo`). The demo account only changes demo data.
+- **District office (demo):** `/official/login` → **PWD / district office** → **Mandi** → Department ID `PWD-MANDI-DEMO`, password `himachal-demo`. Command Centre: priority queue, crew builder, advisories.
+- **On-site crew (demo):** `/official/login` → **On-site crew member** → Crew ID `CREW-MANDI-DEMO`, password `himachal-crew` (Neelam Thakur, a supervisor on duty near Kataula). Build a crew for Kataula as the office first, then sign in as Neelam to see the job arrive. Both demo accounts only change demo data (fictional people).
 
 ## Run it locally
 
@@ -90,7 +91,9 @@ Database: create a Supabase project, run `supabase/migrations/0001…0003*.sql` 
 ```bash
 pnpm load-segments     # 18,280 road segments + 14,677 places from data/ (OpenStreetMap)
 pnpm seed              # demo events, crews, scouts (all is_demo)
-pnpm create-official   # the PWD Mandi (demo) account
+pnpm seed-crews        # demo field workers + machines (fictional people)
+pnpm create-official   # the PWD Mandi (demo) office account
+pnpm create-official --crew-demo   # the demo crew login (Neelam Thakur)
 pnpm seed-slopes       # 2 demo slope sites via the real pipeline (~$0.15 of AI calls)
 ```
 
@@ -129,6 +132,6 @@ Names only live in [`.env.example`](.env.example). Never commit values — the r
 
 - **Cron jobs** (`vercel.json`, all daily — Hobby allows 100 jobs, once a day, ±59 min): news ingest 01:30 UTC, Investigator re-verify 07:30, scout gaps 10:00, Slope Sentinel 11:30, Road Watch sweep 13:00. Road Watch itself is event-driven (runs right after a report / news item / field update); the daily sweep is a safety net. Each cron route checks `Authorization: Bearer $CRON_SECRET` (constant-time).
 - **Rate limits** on every AI endpoint, per IP and per device (`src/lib/guard/rateLimit.ts`), with a friendly "try again in N minutes" message; **daily spend cap** (`src/lib/ai/budget.ts`) checked by every AI job — above it the app uses its no-AI fallbacks instead of failing.
-- **Demo login for judges:** "Try as PWD Mandi (demo)" on `/official/login`. The demo account only changes demo data; its advisories reach demo devices and the judge's own phone, never real travellers. Reset everything it touched with `pnpm demo-reset`.
+- **Demo logins for judges:** office `PWD-MANDI-DEMO` / `himachal-demo` (choose Mandi) and crew `CREW-MANDI-DEMO` / `himachal-crew`; the sign-in checks the account matches the door and district chosen. The demo account only changes demo data; its advisories reach demo devices and the judge's own phone, never real travellers. Reset everything it touched with `pnpm demo-reset`.
 - **Logs:** every AI call is one JSON line in the Vercel logs (purpose, provider, model, tokens, cost, latency, error kind, HTTP status) and a row in `ai_calls` — never keys, photos or voice notes.
 - **Secret scan:** `pnpm scan-secrets` (working tree + full git history).
