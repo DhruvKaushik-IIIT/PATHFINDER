@@ -32,10 +32,14 @@ export interface SlopeSubmitInput {
   scoutRequestId?: string | null;
   takenAt?: string | null;
   isDemo?: boolean;
+  /** Placed on the map ("Pick a spot", B1): demo data, no points, joins demo sites only. */
+  placed?: boolean;
 }
 
 export interface SlopeSubmitResult {
   kind: "slope";
+  /** Placed on the map ("Pick a spot"): demo report, no points. */
+  placed: boolean;
   reportId: string;
   photoId: string;
   siteId: string | null;
@@ -137,7 +141,7 @@ export async function submitSlopeReport(input: SlopeSubmitInput): Promise<SlopeS
   let changes: string[] = [];
   let points = 0;
   if (reportStatus === "accepted" && reading && check) {
-    let site = await findSite(lat, lng, snap.segment?.id ?? null);
+    let site = await findSite(lat, lng, snap.segment?.id ?? null, Boolean(input.placed));
     const before = site ? await siteObservations(site.id, 10) : [];
     if (!site) {
       site = await createSite({ lat, lng, segment_id: snap.segment?.id ?? null, road_ref: roadRef, place_name: snap.placeName, is_demo: input.isDemo ?? false });
@@ -163,7 +167,7 @@ export async function submitSlopeReport(input: SlopeSubmitInput): Promise<SlopeS
         at: shotAt,
         kind: "observation",
         text: `Photo: ${signs.length ? signs.map((k) => SIGN_LABEL[k] ?? k).join(", ") : "no clear warning signs"} · ${check.finalOverall}${check.twoModels ? " · 2 models checked" : ""}${changes.length ? ` · ${changes[0]}` : ""}`,
-        actor: input.scoutRequestId ? "Scout" : "Traveller",
+        actor: input.placed ? "Traveller · placed on map (demo)" : input.scoutRequestId ? "Scout" : "Traveller",
       },
       { last_observed_at: newestShot, ...(!site.place_name && snap.placeName && { place_name: snap.placeName }) },
     );
@@ -189,9 +193,10 @@ export async function submitSlopeReport(input: SlopeSubmitInput): Promise<SlopeS
     }
   }
 
-  const scoutBonus = input.scoutRequestId && reportStatus !== "rejected" ? await fulfilScoutRequest(input.scoutRequestId, id) : 0;
+  const scoutBonus = !input.placed && input.scoutRequestId && reportStatus !== "rejected" ? await fulfilScoutRequest(input.scoutRequestId, id) : 0;
   points += scoutBonus;
-  if (input.userId) await creditUser(input.userId, points, { lat, lng }).catch((err: Error) => console.warn("[slope] points failed:", err.message));
+  if (input.placed) points = 0; // demo report: no points
+  if (input.userId && !input.placed) await creditUser(input.userId, points, { lat, lng }).catch((err: Error) => console.warn("[slope] points failed:", err.message));
   await Promise.all([
     update("reports", `id=eq.${id}`, { points_awarded: points }),
     update("photos", `id=eq.${photoRow!.id}`, { annotated_url: annotatedUrl }),
@@ -199,7 +204,8 @@ export async function submitSlopeReport(input: SlopeSubmitInput): Promise<SlopeS
   timings.total = Date.now() - t0;
 
   return {
-    kind: "slope", reportId: id, photoId: photoRow!.id, siteId, siteAction, observations, reportStatus, reading, check, changes,
+    kind: "slope",
+    placed: Boolean(input.placed), reportId: id, photoId: photoRow!.id, siteId, siteAction, observations, reportStatus, reading, check, changes,
     points, scoutBonus, lat, lng, placeName: snap.placeName,
     road: snap.segment ? { segmentId: snap.segment.id, ref: roadRef } : null,
     publicUrl: pubUrl, annotatedUrl, transcript, facesBlurred: p.facesBlurred, timingsMs: timings, degraded,

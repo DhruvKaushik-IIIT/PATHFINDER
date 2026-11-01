@@ -87,6 +87,12 @@ export default function SlopeDone({
           )}
         </div>
 
+        {r.placed && (
+          <p className="m-0 rounded-[14px] bg-accent-tint px-[14px] py-3 text-[13px] leading-[1.45] text-accent-tint-ink">
+            Placed on the map (demo): same AI checks as a real report, but no points and it never changes real road data.
+          </p>
+        )}
+
         {r.points > 0 && (
           <div className="flex items-center gap-[10px] rounded-[14px] bg-white/84 px-[14px] py-3">
             <span className="rounded-[9px] bg-accent-tint px-[9px] py-[5px] text-[14px] font-bold text-accent-tint-ink">+{r.points}</span>

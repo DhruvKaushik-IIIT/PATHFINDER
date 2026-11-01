@@ -36,6 +36,8 @@ export interface LifecycleInput {
   official?: number;
   news?: number;
   isDemo?: boolean | null;
+  /** Demo event made by a report placed on the map (/report "Pick a spot"): demo data that still expires. */
+  placed?: boolean | null;
   etaClear?: { earliest: string; latest: string } | null;
   potholeSize?: string | null;
   taps?: Taps | null;
@@ -78,7 +80,7 @@ function humanSpan(h: number): string {
 }
 
 export function lifecycleOf(e: LifecycleInput, now = Date.now()): Lifecycle {
-  if (e.isDemo) return { state: "active", shelfLifeH: null, unconfirmedAt: null, expiresAt: null, reason: null };
+  if (e.isDemo && !e.placed) return { state: "active", shelfLifeH: null, unconfirmedAt: null, expiresAt: null, reason: null };
   const last = new Date(e.lastConfirmedAt).getTime();
   let life = shelfLifeH(e.type, e.status, e.potholeSize);
   // News-only (no photo, no official update) is weaker evidence: half the shelf life.

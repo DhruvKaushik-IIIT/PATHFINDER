@@ -46,7 +46,7 @@ export const EVENT_SELECT =
 export function toMapEvent(r: EventRow): MapEvent {
   const life = lifecycleOf({
     type: r.type, status: r.status, lastConfirmedAt: r.last_confirmed_at, reports: r.sources?.reports,
-    official: r.sources?.official, news: r.sources?.news, isDemo: r.is_demo, etaClear: r.eta_clear,
+    official: r.sources?.official, news: r.sources?.news, isDemo: r.is_demo, placed: Boolean((r.sources as { placed?: boolean } | null)?.placed), etaClear: r.eta_clear,
     potholeSize: r.measurements?.potholeSize ?? null, taps: r.sources?.taps,
   });
   return {

@@ -40,6 +40,9 @@ check("photo + news keeps the full life", state({ type: "landslide", status: "cl
 // Demo never expires
 const demo = state({ ...slide, isDemo: true, lastConfirmedAt: hAgo(24 * 30) });
 check("demo event 30 days old → still active, no expiry", demo.state === "active" && demo.expiresAt === null);
+// "Pick a spot" (B1): a demo event made by a report placed on the map still expires like a real one
+const placedOld = state({ ...slide, isDemo: true, placed: true, lastConfirmedAt: hAgo(24 * 30) });
+check("placed-on-map demo event 30 days old → expired", placedOld.state === "expired");
 
 // Promised reopening time passed
 const eta = state({ ...slide, lastConfirmedAt: hAgo(6), etaClear: { earliest: hAgo(4), latest: hAgo(2) } });
