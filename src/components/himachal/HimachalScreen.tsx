@@ -11,6 +11,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { MapRef } from "react-map-gl/maplibre";
 import Sheet from "@/components/glass/Sheet";
 import Toast from "@/components/glass/Toast";
+import { HP_BOUNDS } from "@/lib/geo/himachal";
 import { ago, eventTitle, STATUS_STYLE, type TopResult } from "@/lib/events/types";
 
 const MapView = dynamic(() => import("@/components/map/MapView"), {
@@ -18,10 +19,6 @@ const MapView = dynamic(() => import("@/components/map/MapView"), {
   loading: () => <div className="absolute inset-0 bg-land" />,
 });
 
-const HP_BOUNDS: [[number, number], [number, number]] = [
-  [75.6, 30.4],
-  [78.9, 33.2],
-];
 
 export default function HimachalScreen() {
   const router = useRouter();

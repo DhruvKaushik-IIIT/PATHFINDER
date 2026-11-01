@@ -19,6 +19,7 @@ import { useLocationPing } from "@/components/me/useLocationPing";
 import { STATUS_STYLE, type MapEvent, type TopResult } from "@/lib/events/types";
 import type { Place } from "@/lib/geo/placeTypes";
 import { routeUrl, type WatchedTrip } from "@/lib/watch/types";
+import { HP_BOUNDS, loadLastView, locationAllowed, PLACE_ZOOM, saveLastView } from "@/lib/geo/himachal";
 
 // MapLibre needs `window` → client-only.
 const MapView = dynamic(() => import("@/components/map/MapView"), {
@@ -50,6 +51,57 @@ export default function HomeScreen() {
   useLocationPing(locationOn);
   const { unread, watching } = useRoadWatch();
 
+  // Opening view (no default town): your location if already allowed → where you were last time
+  // on this phone → all of Himachal. Never prompts for location on open.
+  const [lastView] = useState(loadLastView);
+  const firstView = useRef(true);
+  const meRef = useRef<LatLng | null>(null);
+  meRef.current = me;
+  useEffect(() => {
+    let alive = true;
+    locationAllowed().then((ok) => {
+      if (!ok || !alive) return;
+      navigator.geolocation.getCurrentPosition(
+        (p) => {
+          if (!alive) return;
+          const loc = { latitude: p.coords.latitude, longitude: p.coords.longitude };
+          setMe(loc);
+          mapRef.current?.flyTo({ center: [loc.longitude, loc.latitude], zoom: Math.max(mapRef.current.getZoom(), 10), duration: 800 });
+        },
+        () => {},
+        { enableHighAccuracy: false, timeout: 8_000, maximumAge: 5 * 60_000 },
+      );
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const onViewChange = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    if (firstView.current) {
+      firstView.current = false;
+      // Location arrived before the map finished loading → start there.
+      const m = meRef.current;
+      if (m) return void map.jumpTo({ center: [m.longitude, m.latitude], zoom: Math.max(map.getZoom(), 10) });
+      // First visit: fit the whole state above the sheet.
+      if (!lastView) return void map.fitBounds(HP_BOUNDS, { padding: { top: 100, bottom: 380, left: 16, right: 16 }, duration: 0 });
+    }
+    const c = map.getCenter();
+    saveLastView({ latitude: c.lat, longitude: c.lng, zoom: map.getZoom() });
+  }, [lastView]);
+
+  /** Nearby: your location if we have it, else the place you're looking at (zoomed in), else Nearby asks. */
+  function openNearby() {
+    const map = mapRef.current;
+    if (me) return router.push(`/nearby?lat=${me.latitude.toFixed(4)}&lng=${me.longitude.toFixed(4)}&me=1`);
+    if (map && map.getZoom() >= PLACE_ZOOM) {
+      const c = map.getCenter();
+      return router.push(`/nearby?mlat=${c.lat.toFixed(4)}&mlng=${c.lng.toFixed(4)}`);
+    }
+    router.push("/nearby");
+  }
+
   function pick(p: Place) {
     setPicked(p);
     setSelected(null);
@@ -80,7 +132,9 @@ export default function HomeScreen() {
         events={events}
         selectedEventId={selected?.id ?? null}
         onSelectEvent={setSelected}
+        initialView={lastView ?? undefined}
         onViewChange={() => {
+          onViewChange();
           refresh();
           refreshSlopes();
         }}
@@ -157,7 +211,7 @@ export default function HomeScreen() {
           <>
           <div className="grid grid-cols-3 gap-[10px]">
             <Tile href="/route" label="Journey" icon={<Route size={26} strokeWidth={2} aria-hidden />} />
-            <Tile href="/nearby" label="Nearby" icon={<Target size={26} strokeWidth={2} aria-hidden />} />
+            <Tile onClick={openNearby} label="Nearby" icon={<Target size={26} strokeWidth={2} aria-hidden />} />
             <Tile href="/report" label="Report" filled icon={<Camera size={26} strokeWidth={2} aria-hidden />} />
           </div>
 
@@ -237,9 +291,9 @@ function useTop(): { text: string; dot: string } {
   };
 }
 
-function Tile({ href, label, icon, filled = false }: { href: string; label: string; icon: React.ReactNode; filled?: boolean }) {
-  return (
-    <Link href={href} className="flex flex-col items-center gap-[7px] text-ink no-underline">
+function Tile({ href, onClick, label, icon, filled = false }: { href?: string; onClick?: () => void; label: string; icon: React.ReactNode; filled?: boolean }) {
+  const inner = (
+    <>
       <span
         className={`flex h-[62px] w-full items-center justify-center rounded-2xl ${
           filled ? "bg-accent text-white" : "bg-white/80 text-accent"
@@ -248,7 +302,17 @@ function Tile({ href, label, icon, filled = false }: { href: string; label: stri
         {icon}
       </span>
       <span className="text-[13px] font-semibold">{label}</span>
+    </>
+  );
+  const cls = "flex flex-col items-center gap-[7px] text-ink no-underline";
+  return href ? (
+    <Link href={href} className={cls}>
+      {inner}
     </Link>
+  ) : (
+    <button type="button" onClick={onClick} className={cls}>
+      {inner}
+    </button>
   );
 }
 
