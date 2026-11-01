@@ -29,7 +29,7 @@ function read<T>(key: string, ok: (v: T) => boolean): T | null {
   try {
     if (typeof window === "undefined") return null;
     const v = JSON.parse(window.localStorage.getItem(key) ?? "null") as T | null;
-    return v && ok(v) ? v : null;
+    return v !== null && v !== undefined && ok(v) ? v : null;
   } catch {
     return null;
   }
@@ -46,7 +46,12 @@ const inNorthIndia = (lat: number, lng: number) => lat >= 26 && lat <= 35 && lng
 
 /** Where the Home map was last time on this phone. */
 export const loadLastView = () =>
-  read<View>(VIEW_KEY, (v) => Number.isFinite(v.zoom) && inNorthIndia(v.latitude, v.longitude));
+  read<View>(VIEW_KEY, (v) => Number.isFinite(v.zoom) && Math.abs(v.latitude) <= 85 && Math.abs(v.longitude) <= 180);
+
+const PINS_KEY = "pf:showPins";
+/** Home's "show road issues on the map" toggle (default on). */
+export const loadShowPins = () => read<boolean>(PINS_KEY, (v) => typeof v === "boolean") ?? true;
+export const saveShowPins = (on: boolean) => write(PINS_KEY, on);
 export const saveLastView = (v: View) =>
   write(VIEW_KEY, { latitude: +v.latitude.toFixed(4), longitude: +v.longitude.toFixed(4), zoom: +v.zoom.toFixed(2) });
 

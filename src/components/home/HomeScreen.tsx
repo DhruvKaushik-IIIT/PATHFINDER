@@ -1,7 +1,7 @@
 "use client";
 
 // Frame 02 Home (docs/design/glass-html/Main.dc.html): map + floating glass buttons + bottom sheet.
-import { Bell, Camera, ChevronRight, Eye, Layers, MapPin, Navigation, Route, Target, User } from "lucide-react";
+import { Bell, Camera, ChevronRight, Eye, Layers, MapPin, MapPinned, MapPinOff, Navigation, Route, Target, User } from "lucide-react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -19,7 +19,7 @@ import { useLocationPing } from "@/components/me/useLocationPing";
 import { STATUS_STYLE, type MapEvent, type TopResult } from "@/lib/events/types";
 import type { Place } from "@/lib/geo/placeTypes";
 import { routeUrl, type WatchedTrip } from "@/lib/watch/types";
-import { HP_BOUNDS, loadLastView, locationAllowed, PLACE_ZOOM, saveLastView } from "@/lib/geo/himachal";
+import { HP_BOUNDS, loadLastView, loadShowPins, locationAllowed, PLACE_ZOOM, saveLastView, saveShowPins } from "@/lib/geo/himachal";
 
 // MapLibre needs `window` → client-only.
 const MapView = dynamic(() => import("@/components/map/MapView"), {
@@ -31,6 +31,16 @@ export default function HomeScreen() {
   const mapRef = useRef<MapRef>(null);
   const [me, setMe] = useState<LatLng | null>(null);
   const [showRoads, setShowRoads] = useState(true);
+  // Road-issue pins (events + slope sites) on/off, remembered on this phone. Starts on for SSR, then reads storage.
+  const [showPins, setShowPins] = useState(true);
+  useEffect(() => setShowPins(loadShowPins()), []);
+  function togglePins() {
+    setShowPins((on) => {
+      saveShowPins(!on);
+      if (on) setSelected(null);
+      return !on;
+    });
+  }
   const [locating, setLocating] = useState(false);
   const { events, refresh } = useEvents(mapRef);
   const { slopes, refresh: refreshSlopes } = useSlopes(mapRef);
@@ -129,7 +139,7 @@ export default function HomeScreen() {
         mapRef={mapRef}
         myLocation={me}
         showRoadLayer={showRoads}
-        events={events}
+        events={showPins ? events : []}
         selectedEventId={selected?.id ?? null}
         onSelectEvent={setSelected}
         initialView={lastView ?? undefined}
@@ -139,7 +149,7 @@ export default function HomeScreen() {
           refreshSlopes();
         }}
       >
-        <SlopeLayer pins={slopes} onSelect={(p) => router.push(`/slope/${p.id}`)} />
+        <SlopeLayer pins={showPins ? slopes : []} onSelect={(p) => router.push(`/slope/${p.id}`)} />
         {picked && (
           <Marker latitude={picked.lat} longitude={picked.lng} anchor="bottom">
             <MapPin size={34} strokeWidth={2} className="text-accent drop-shadow" fill="white" aria-label={picked.name} />
@@ -189,6 +199,16 @@ export default function HomeScreen() {
             className={`flex size-[46px] items-center justify-center text-accent ${locating ? "animate-pulse" : ""}`}
           >
             <Navigation size={20} strokeWidth={2} fill="currentColor" aria-hidden className="rotate-90" />
+          </button>
+          <span className="mx-[10px] h-[0.5px] bg-black/15" />
+          <button
+            type="button"
+            aria-label={showPins ? "Hide road issues on the map" : "Show road issues on the map"}
+            aria-pressed={showPins}
+            onClick={togglePins}
+            className={`flex size-[46px] items-center justify-center ${showPins ? "text-accent" : "text-ink"}`}
+          >
+            {showPins ? <MapPinned size={21} strokeWidth={2} aria-hidden /> : <MapPinOff size={21} strokeWidth={2} aria-hidden />}
           </button>
         </div>
       </div>

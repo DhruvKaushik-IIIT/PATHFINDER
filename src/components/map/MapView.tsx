@@ -16,8 +16,6 @@ import { loadGlassStyle } from "./glassStyle";
 // predev/prebuild copy it into public/vendor/ (same installed version).
 setWorkerUrl("/vendor/maplibre-gl-worker.mjs");
 
-// Pan freely across North India so routes from Delhi / Punjab / J&K stay visible (7.6).
-const NORTH_INDIA: [number, number, number, number] = [72, 26, 82, 35]; // W, S, E, N
 
 async function loadGeo(path: string): Promise<FeatureCollection | null> {
   try {
@@ -85,8 +83,9 @@ export default function MapView({
       ref={mapRef}
       mapStyle={style}
       initialViewState={initialView ?? HP_VIEW}
-      maxBounds={NORTH_INDIA}
-      minZoom={5}
+      // Pan and zoom out freely across the whole world (Nov 1); routes from anywhere stay visible.
+      minZoom={1}
+      renderWorldCopies={false}
       style={{ position: "absolute", inset: 0 }}
       attributionControl={false}
       dragRotate={false}
