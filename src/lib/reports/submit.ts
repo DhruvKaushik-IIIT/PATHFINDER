@@ -5,7 +5,7 @@
 //   → claim (Baseten Spark Open → Meta Spark) → verifier (Meta Spark, independent)
 //   → save report/photo/claims → merge into or create the road event → annotated photo.
 // AI failures degrade (5.7); database failures throw (the route turns them into a clean 503).
-import { transcribe, verifyClaim, writeClaim } from "../ai/router.ts";
+import { ensureHindi, transcribe, verifyClaim, writeClaim } from "../ai/router.ts";
 import type { Claim, Verdict } from "../ai/schemas.ts";
 import { insert, publicUrl, select, update, upload } from "../db/supabase.ts";
 import { snapToRoad } from "../geo/snap.ts";
@@ -110,6 +110,12 @@ export async function submitReport(input: SubmitInput): Promise<SubmitResult> {
   else if (claimRes.degraded) degraded.push(`claim: ${claimRes.degraded}`);
   // The first claim is about the photo's spot; a model may still mislabel it, so look it up.
   const here = claims.find((c) => c.atReportLocation) ?? null;
+  // B3: Hindi summaries must be Devanagari — repaired in parallel with the verifier (no-op when already fine).
+  const hindiFixed = Promise.all(
+    claims.map(async (c) => {
+      c.summaryHi = await ensureHindi(c.summary, c.summaryHi);
+    }),
+  );
 
   let verdict: Verdict | null = null;
   let verifiedBy: string | null = null;
@@ -138,6 +144,8 @@ export async function submitReport(input: SubmitInput): Promise<SubmitResult> {
       reasoning: verdict.reasoning,
     };
   }
+
+  await hindiFixed;
 
   // ---- persist
   const [report] = await insert<{ id: string }>("reports", {
