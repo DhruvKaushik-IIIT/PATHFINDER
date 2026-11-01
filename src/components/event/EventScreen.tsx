@@ -1,5 +1,6 @@
 "use client";
 
+import { liveFetch } from "@/lib/live";
 // Frame 05 Disruption detail (docs/design/glass-html/Disruption.dc.html): tall sheet over the map.
 // Big numbers first (stat tiles), evidence below (photo, sources, timeline). Every number is "~".
 import { CarFront, Check, CircleHelp, Clock, Image as ImageIcon, Newspaper, ScanSearch, Share2, ShieldCheck, TrendingUp, X } from "lucide-react";
@@ -31,7 +32,7 @@ export default function EventScreen({ id }: { id: string }) {
 
   useEffect(() => {
     let alive = true;
-    fetch(`/api/events/${id}`)
+    liveFetch(`/api/events/${id}`)
       .then((r) => r.json())
       .then((b: { data?: EventDetail | null; error?: string; degraded?: string }) => {
         if (!alive) return;
@@ -40,7 +41,7 @@ export default function EventScreen({ id }: { id: string }) {
       })
       .catch(() => alive && setError("Couldn't load this event"));
     // Crew progress card (frame 05): official field updates / assigned crew, if any.
-    fetch(`/api/repairs?ids=${id}`)
+    liveFetch(`/api/repairs?ids=${id}`)
       .then((r) => r.json() as Promise<{ data?: Repair[] }>)
       .then((b) => alive && setRepair(b.data?.[0] ?? null))
       .catch(() => {});

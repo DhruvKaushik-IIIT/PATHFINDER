@@ -24,6 +24,15 @@ export interface Repair {
 /** ["JCB","JCB","Tipper"] / ["2 JCB","1 tipper"] → "2 JCB + tipper" style text. */
 export function machinesLabel(m: string[]): string {
   if (!m.length) return "—";
+  // Crew machines with fleet codes ("JCB-03 JCB 3DX backhoe") → "3× JCB 3DX backhoe + 6× Tata 1613 tipper".
+  if (m.every((x) => /^[A-Z]{2,4}-\d+ /.test(x))) {
+    const byLabel = new Map<string, number>();
+    for (const x of m) {
+      const label = x.replace(/^[A-Z]{2,4}-\d+ /, "");
+      byLabel.set(label, (byLabel.get(label) ?? 0) + 1);
+    }
+    return [...byLabel].map(([label, n]) => `${n}× ${label}`).join(" + ");
+  }
   if (m.some((x) => /^\d/.test(x))) return m.join(", ");
   const counts = new Map<string, number>();
   for (const x of m) counts.set(x, (counts.get(x) ?? 0) + 1);

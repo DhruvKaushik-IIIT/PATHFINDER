@@ -1,5 +1,6 @@
 "use client";
 
+import { liveFetch } from "@/lib/live";
 // Frame 08 Nearby (docs/design/glass-html/Nearby.dc.html): radius circle on the map, floating glass
 // radius picker, sheet with the AI summary + ranked list. Centre = ?lat&lng[&name], else your
 // location, else the area you were looking at on Home's map (?mlat&mlng), else the place you picked
@@ -108,7 +109,7 @@ export default function NearbyScreen() {
     setLoading(true);
     const qs = new URLSearchParams({ lat: center.lat.toFixed(4), lng: center.lng.toFixed(4), radiusKm: String(radius) });
     if (center.name) qs.set("name", center.name);
-    fetch(`/api/nearby?${qs}`)
+    liveFetch(`/api/nearby?${qs}`)
       .then((r) => r.json() as Promise<{ data: NearbyResult | null; degraded?: string }>)
       .then((b) => {
         if (!alive) return;

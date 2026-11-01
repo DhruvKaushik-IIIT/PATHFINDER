@@ -1,5 +1,6 @@
 // GET /api/route?from=lat,lng&to=lat,lng[&fromName=&toName=&depart=ISO] → RoutePlan.
 // No AI here (7.5b): OSRM + HP split + events on route + code verdict. Route Check agent = Part B.
+import { liveCache } from "@/lib/events/version.ts";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { planRoute } from "@/lib/geo/route.ts";
@@ -37,7 +38,7 @@ export async function GET(req: Request) {
     );
     // Edge cache (Nov 1 speed fix): a new route needs 2+ calls to the public OSRM server (~1 s each);
     // repeats of the same trip within 2 min are served instantly, then refreshed in the background.
-    return NextResponse.json({ ok: true, data: plan, ...(degraded && { degraded }) }, degraded ? undefined : { headers: { "Cache-Control": "public, s-maxage=120, stale-while-revalidate=600" } });
+    return NextResponse.json({ ok: true, data: plan, ...(degraded && { degraded }) }, { headers: degraded ? { "Cache-Control": "no-store" } : liveCache(req, 120) });
   } catch (err) {
     console.error("[route] routing failed:", (err as Error).message);
     return NextResponse.json({ ok: true, data: null, degraded: "Routing is unavailable right now — please try again" });

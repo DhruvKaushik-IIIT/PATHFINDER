@@ -1,5 +1,6 @@
 "use client";
 
+import { liveFetch } from "@/lib/live";
 // "Across Himachal right now": the 10 open incidents/closures that affect the most people, state-wide.
 // Same layout as Nearby (frame 08): map with the pins, glass back button, sheet with the ranked list.
 // Ranking is plain code (lib/events/top.ts): reach first (traffic, traveller hubs, watched trips), then damage.
@@ -30,7 +31,7 @@ export default function HimachalScreen() {
 
   useEffect(() => {
     let alive = true;
-    fetch("/api/top?limit=10")
+    liveFetch("/api/top?limit=10")
       .then((r) => r.json() as Promise<{ data: TopResult | null; degraded?: string }>)
       .then((b) => {
         if (!alive) return;

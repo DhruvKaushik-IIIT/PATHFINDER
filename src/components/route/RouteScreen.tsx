@@ -1,5 +1,6 @@
 "use client";
 
+import { liveFetch } from "@/lib/live";
 // Frame 03 Route result (docs/design/glass-html/Route.dc.html). Two steps so it feels instant:
 // 1. GET /api/route → map, route line, code verdict (no AI, ~1 s)
 // 2. POST /api/route-check → the Route Check agent's verdict replaces it (5–30 s; cached 20 min)
@@ -67,14 +68,14 @@ export default function RouteScreen() {
     (async () => {
       try {
         const qs = new URLSearchParams({ from, to, fromName, toName, ...(depart && { depart }) });
-        const body = (await (await fetch(`/api/route?${qs}`)).json()) as { data: RoutePlan | null; degraded?: string };
+        const body = (await (await liveFetch(`/api/route?${qs}`)).json()) as { data: RoutePlan | null; degraded?: string };
         if (!alive) return;
         if (!body.data) return setError(body.degraded ?? "Routing is unavailable right now");
         setPlan(body.data);
         if (body.degraded) setToast(body.degraded);
 
         // Rain risk (no AI) loads alongside the agent; it reuses the plan the server just cached.
-        fetch(`/api/risk/route?${qs}${replay ? "&replay=1" : ""}`)
+        liveFetch(`/api/risk/route?${qs}${replay ? "&replay=1" : ""}`)
           .then((r) => r.json() as Promise<{ data: RouteRisk | null }>)
           .then((b) => alive && setRisk(b.data))
           .catch(() => {});
@@ -127,7 +128,7 @@ export default function RouteScreen() {
   useEffect(() => {
     if (!eventKey) return setCrewsAtWork(0);
     let alive = true;
-    fetch(`/api/repairs?ids=${eventKey}`)
+    liveFetch(`/api/repairs?ids=${eventKey}`)
       .then((r) => r.json() as Promise<{ data: Repair[] }>)
       .then((b) => alive && setCrewsAtWork(b.data.filter((x) => x.atWork).length))
       .catch(() => {});

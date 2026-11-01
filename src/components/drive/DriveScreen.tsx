@@ -1,5 +1,6 @@
 "use client";
 
+import { liveFetch } from "@/lib/live";
 // Drive Watch (Phase 6A, scoped-down frame 10c): runs alongside Google Maps. Live GPS on the chosen
 // route, distance left, spoken hazard-ahead alerts at 5 km and 1 km (distance ALONG the route),
 // Road Watch changes during the drive (polling /api/events), screen wake lock. No turn-by-turn, no AI.
@@ -94,7 +95,7 @@ export default function DriveScreen() {
     const saved = loadCheck();
     if (saved && saved.query === routeQuery) return setPlan(saved.plan);
     let alive = true;
-    fetch(`/api/route?${routeQuery}`)
+    liveFetch(`/api/route?${routeQuery}`)
       .then((r) => r.json() as Promise<{ data: RoutePlan | null; degraded?: string }>)
       .then((b) => {
         if (!alive) return;
@@ -251,7 +252,7 @@ export default function DriveScreen() {
     let baseline = true; // the first poll only lines up our list with /api/events (no alerts)
     const poll = async () => {
       try {
-        const b = (await (await fetch(`/api/events?bbox=${bbox.join(",")}`)).json()) as { data: MapEvent[] };
+        const b = (await (await liveFetch(`/api/events?bbox=${bbox.join(",")}`)).json()) as { data: MapEvent[] };
         if (!alive || !Array.isArray(b.data)) return;
         const next = b.data.filter(isHazard).map(toHazard).filter(onRoute);
         const ahead = (h: DriveEvent) => h.alongKm - meKm.current;
