@@ -85,3 +85,9 @@ export function routeUrl(from: PlacePoint, to: PlacePoint, departAt: string | nu
   if (departAt && new Date(departAt).getTime() > Date.now()) q.set("depart", departAt);
   return `/route?${q}`;
 }
+
+/** "Your Mandi → Manali trip", or "Your trip to Manali" when the start is just the phone's position (B2:
+ *  was "Your Your location → Manali trip"). */
+export function tripTitle(from: string, to: string): string {
+  return /^your location$/i.test(from.trim()) ? `Your trip to ${to}` : `Your ${from} → ${to} trip`;
+}

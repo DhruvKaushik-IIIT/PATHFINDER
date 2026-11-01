@@ -40,6 +40,7 @@ _Format: ID · date · area · steps · expected · actual · likely cause · se
 - **Actual:** alert title "Your Your location → Manali trip changed".
 - **Likely cause:** `src/lib/watch/roadWatch.ts:187` builds `Your ${name} trip changed` and the trip's from name is the literal "Your location".
 - **Severity:** cosmetic (visible in /alerts and in the demo).
+- **Status: FIXED (Nov 2)** — `tripTitle()` in `src/lib/watch/types.ts`: "Your trip to Manali changed" when the start is "Your location", else "Your Mandi → Manali trip changed"; slope alerts use it too ("Unstable slope on your trip to Manali"). `pnpm test:hindi` checks both.
 
 ### B3 · Nov 1 · Report · Hindi summary in Latin script
 - **Steps:** send a road photo (F1 report, event 1fd7d704…).
@@ -47,3 +48,4 @@ _Format: ID · date · area · steps · expected · actual · likely cause · se
 - **Actual:** "Bhusklhan se sadak ki ek lane band hai…" (romanised Hindi, also a misspelling of भूस्खलन), shown on the event page Hindi line.
 - **Likely cause:** claim writer (Baseten, claim-v3) ignores "(Devanagari)" sometimes; unlike the fit check there is no code check for Devanagari characters on `summaryHi` in `writeClaim` (schemas.ts:34 is only a description).
 - **Severity:** minor.
+- **Status: FIXED (Nov 2)** — `ensureHindi()` in `src/lib/ai/router.ts`: a Hindi summary with <5 Devanagari letters is re-translated from the English sentence by a small job (`translate_hindi`, Meta Spark → Baseten, prompt hindi-v1, zod refine = Devanagari), in parallel with the verifier; if both fail the Hindi line is left empty (hidden) instead of wrong. Used for road claims and slope readings. Not a JSON-schema `pattern` (that made Baseten answer "स" in Phase 6C). Live: the very next Baseten claim was Latin again → repaired in 2.6 s, $0.003, total report 19.5 s. Existing open events repaired once (Mandi test report, Archhandi demo).

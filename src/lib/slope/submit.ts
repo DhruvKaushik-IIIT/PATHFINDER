@@ -5,7 +5,7 @@
 //   → reading (Baseten Spark Open → Meta Spark) → independent check (Meta Spark → Baseten → rules)
 //   → save report/photo → join or create a slope site → observation (+ change metrics) → annotated copy.
 // The risk agent runs AFTER the response (the route calls assessSite via after()). Never touches events.
-import { checkSlope, readSlope, transcribe } from "../ai/router.ts";
+import { checkSlope, ensureHindi, readSlope, transcribe } from "../ai/router.ts";
 import type { SlopeReading } from "../ai/schemas.ts";
 import { insert, publicUrl, update, upload } from "../db/supabase.ts";
 import { snapToRoad } from "../geo/snap.ts";
@@ -95,6 +95,8 @@ export async function submitSlopeReport(input: SlopeSubmitInput): Promise<SlopeS
   else if (read.degraded) degraded.push(`reading: ${read.degraded}`);
 
   let check: SlopeCheckRecord | null = null;
+  // B3: Hindi summary must be Devanagari (repaired in parallel with the second check).
+  const hindiFixed = reading ? ensureHindi(reading.summary, reading.summaryHi).then((hi) => void (reading.summaryHi = hi)) : null;
   if (reading) {
     const t2 = Date.now();
     const ctx = `Photo of the slope at ${snap.placeName ?? "an unknown place"}${roadRef ? ` on ${roadRef}` : ""}, taken ${shotAt}.`;
@@ -109,6 +111,8 @@ export async function submitSlopeReport(input: SlopeSubmitInput): Promise<SlopeS
     check = { ...ch, by, readBy: reading.by, twoModels: by !== reading.by && by !== "rules" && by !== "mock", finalOverall };
   }
   const reportStatus: SlopeSubmitResult["reportStatus"] = !reading || !check ? "pending" : check.verdict === "reject" || !reading.isSlopePhoto ? "rejected" : "accepted";
+
+  await hindiFixed;
 
   // ---- persist report + photo (same buckets/privacy rules as road reports)
   const [report] = await insert<{ id: string }>("reports", {

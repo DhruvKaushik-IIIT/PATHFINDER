@@ -7,7 +7,7 @@ import { checkRoute } from "../geo/check.ts";
 import { planRoute } from "../geo/route.ts";
 import type { RoutePlan } from "../geo/routeTypes.ts";
 import { eventTitle, STATUS_STYLE, type EventStatus } from "../events/types.ts";
-import { routeUrl, type PlacePoint, type TripChange, type WatchedTrip, type WatchSnapshot } from "./types.ts";
+import { routeUrl, tripTitle, type PlacePoint, type TripChange, type WatchedTrip, type WatchSnapshot } from "./types.ts";
 
 const MAX_TRIPS_PER_RUN = 25;
 const STALE_AFTER_H = 12; // a trip whose departure was >12 h ago stops being watched
@@ -161,6 +161,7 @@ export interface WatchResult {
 /** Re-check one trip. No AI unless the disruptions on its route changed. */
 export async function checkTrip(trip: TripRow): Promise<WatchResult> {
   const name = `${trip.from_place.name} → ${trip.to_place.name}`;
+  const title = `${tripTitle(trip.from_place.name, trip.to_place.name)} changed`;
   const base = { tripId: trip.id, trip: name };
   if (trip.depart_at && Date.now() - new Date(trip.depart_at).getTime() > STALE_AFTER_H * 3_600_000) {
     await update("watched_trips", `id=eq.${trip.id}`, { active: false });
@@ -184,7 +185,7 @@ export async function checkTrip(trip: TripRow): Promise<WatchResult> {
       await insert("alerts", {
         user_id: trip.user_id,
         kind: "road_watch",
-        title: `Your ${name} trip changed`,
+        title,
         body: `${describe(changes)} ${v.headline}`,
         data: { tripId: trip.id, trip: name, url, verdict: v.verdict, headlineHi: v.headlineHi, changes, by: check.by },
       });
@@ -232,3 +233,4 @@ export async function roadWatchAfterChange(points: { lat: number; lng: number }[
     console.warn("[road-watch] failed:", (err as Error).message);
   }
 }
+

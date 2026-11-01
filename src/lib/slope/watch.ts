@@ -3,7 +3,7 @@
 import { insert, select } from "../db/supabase.ts";
 import { cumulative, project, type Coord } from "../drive/line.ts";
 import { planRoute } from "../geo/route.ts";
-import { routeUrl, type PlacePoint } from "../watch/types.ts";
+import { routeUrl, tripTitle, type PlacePoint } from "../watch/types.ts";
 import { SLOPE_WORD, type SlopeSite } from "./types.ts";
 
 const PAD = 0.05;
@@ -41,7 +41,7 @@ export async function slopeWatchAlerts(site: SlopeSite): Promise<number> {
     await insert("alerts", {
       user_id: t.user_id,
       kind: "road_watch",
-      title: `Unstable slope on your ${name} trip`,
+      title: `Unstable slope on ${tripTitle(t.from_place.name, t.to_place.name).replace(/^Your /, "your ")}`,
       body: `${SLOPE_WORD[site.risk_level]} slope risk above the road near ${place} (km ${Math.round(p.alongKm)}). ${site.risk?.reasons?.[0] ?? ""} ${site.risk?.advice ?? ""}`.trim(),
       data: {
         tripId: t.id, trip: name, url: `/slope/${site.id}`, routeUrl: routeUrl(t.from_place, t.to_place, t.depart_at),
