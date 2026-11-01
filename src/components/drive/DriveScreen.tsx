@@ -55,7 +55,9 @@ interface Banner {
   slope?: boolean;
 }
 
-const isHazard = (e: { status: string; type: string }) => e.status !== "open" && e.type !== "clear";
+// Unconfirmed events (past half their shelf life) are not announced (docs/event-lifecycle.md).
+const isHazard = (e: { status: string; type: string; lifecycle?: MapEvent["lifecycle"] }) =>
+  e.status !== "open" && e.type !== "clear" && e.lifecycle?.state !== "unconfirmed";
 
 export default function DriveScreen() {
   const params = useSearchParams();
@@ -254,6 +256,8 @@ export default function DriveScreen() {
       try {
         const b = (await (await liveFetch(`/api/events?bbox=${bbox.join(",")}`)).json()) as { data: MapEvent[] };
         if (!alive || !Array.isArray(b.data)) return;
+        // Going grey (Unconfirmed) is not "cleared": forget it quietly instead of announcing it.
+        for (const e of b.data) if (e.lifecycle?.state === "unconfirmed") known.current.delete(e.id);
         const next = b.data.filter(isHazard).map(toHazard).filter(onRoute);
         const ahead = (h: DriveEvent) => h.alongKm - meKm.current;
         for (const c of baseline ? [] : diffEvents(known.current, next)) {

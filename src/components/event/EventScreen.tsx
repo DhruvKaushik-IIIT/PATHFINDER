@@ -9,7 +9,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { approxRange, clearWindow } from "@/lib/events/format";
-import { ago, STATUS_STYLE, type EventDetail, type InvestigationSummary } from "@/lib/events/types";
+import { ago, isUnconfirmed, STATUS_STYLE, UNCONFIRMED_STYLE, type EventDetail, type InvestigationSummary } from "@/lib/events/types";
 import { eventTitle } from "@/components/route/routeData";
 import CrewCard from "@/components/repairs/CrewCard";
 import SiteNote from "@/components/repairs/SiteNote";
@@ -24,6 +24,9 @@ const MapView = dynamic(() => import("@/components/map/MapView"), {
 
 const TIME = new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", hour: "numeric", minute: "2-digit" });
 const t = (iso: string) => TIME.format(new Date(iso)).replace(/\s?(am|pm)$/i, (m) => ` ${m.trim().toUpperCase()}`);
+const DAY = new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", weekday: "short", day: "numeric", month: "short" });
+/** "4:30 PM" today, else "Tue, 4 Nov, 4:30 PM". */
+const when = (iso: string) => (DAY.format(new Date(iso)) === DAY.format(new Date()) ? t(iso) : `${DAY.format(new Date(iso))}, ${t(iso)}`);
 
 export default function EventScreen({ id }: { id: string }) {
   const router = useRouter();
@@ -113,6 +116,22 @@ export default function EventScreen({ id }: { id: string }) {
                 <X size={16} strokeWidth={2.6} aria-hidden />
               </button>
             </div>
+
+            {/* Shelf life (docs/event-lifecycle.md): past half → grey card, no route delay, closes itself at the end. */}
+            {isUnconfirmed(ev) && (
+              <div role="status" className="flex gap-3 rounded-[16px] p-[14px]" style={{ background: UNCONFIRMED_STYLE.bg }}>
+                <Clock size={20} strokeWidth={2.4} className="mt-px shrink-0" style={{ color: UNCONFIRMED_STYLE.ink }} aria-hidden />
+                <span className="flex min-w-0 flex-col gap-0.5">
+                  <span className="text-[15px] font-bold" style={{ color: UNCONFIRMED_STYLE.ink }}>
+                    Unconfirmed · last report {ago(ev.lastConfirmedAt)}
+                  </span>
+                  <span className="text-[13px] leading-[1.4] text-ink-2">
+                    {ev.lifecycle?.reason ?? "No recent reports"}. It may already be cleared, so routes don&apos;t count a delay here.
+                    {ev.lifecycle?.expiresAt ? ` Removed automatically around ${when(ev.lifecycle.expiresAt)} unless someone confirms it.` : ""}
+                  </span>
+                </span>
+              </div>
+            )}
 
             {/* evidence photo (AI-annotated, faces/plates blurred) */}
             {photo ? (

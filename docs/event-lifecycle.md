@@ -1,6 +1,6 @@
 # Event lifecycle: shelf life, "Still there?", auto-close
 
-> Design agreed with Dhruv on Nov 1, 2026 (not built yet). Status of each part is at the bottom.
+> Design agreed with Dhruv on Nov 1, 2026. Part A built Nov 1 (see bottom); B and C not yet.
 
 ## Why
 Pathfinder is not yet used by PWD, so nobody may tell us when a road is cleared.
@@ -25,8 +25,8 @@ at **full** shelf life it is **closed automatically**.
 | Landslide | slow | 24 h | 12 h |
 | Landslide | one lane | 48 h | 24 h |
 | Landslide | closed | 72 h | 36 h |
-| Road damage | one lane | 5 days ⚠ to confirm | 2.5 days |
-| Road damage | closed | 7 days ⚠ to confirm | 3.5 days |
+| Road damage | one lane | 5 days (default, not objected to) | 2.5 days |
+| Road damage | closed | 7 days | 3.5 days |
 | Pothole · medium | slow | 14 days | 7 days |
 | Pothole · severe | one lane | 21 days | 10.5 days |
 | Closure notice | — | notice end date, else 72 h | half |
@@ -106,6 +106,16 @@ If the Investigator finds news that the road reopened → the event goes straigh
 ## Build plan & status
 | Part | Content | Status |
 |---|---|---|
-| A | Shelf life, Unconfirmed state, auto-close, pothole sizes | ⬜ |
+| A | Shelf life, Unconfirmed state, auto-close, pothole sizes | ✅ Nov 1 |
 | B | "Still there?" taps | ⬜ |
 | C | Drive Watch passing traffic + Investigator news → Unconfirmed | ⬜ |
+
+## Part A — how it was built (Nov 1)
+- `src/lib/events/lifecycle.ts`: `shelfLifeH()` + `lifecycleOf()` (pure, client-safe). Tests: `pnpm test:lifecycle` (20 checks).
+- `src/lib/events/expire.ts`: `closeExpired()` (resolved_at + timeline "… removed automatically", actor "Pathfinder (automatic)", idempotent), `sweepExpired()` (real events only; **events with a crew assigned are never auto-closed**, they stay Unconfirmed; closing triggers Road Watch), `maybeSweepExpired()` = lazy sweep on reads, at most every 10 min per instance (Vercel Hobby crons are daily). Daily cron: `/api/cron/reverify` sweeps first.
+- Every `MapEvent` carries `lifecycle`; expired-but-not-yet-closed is shown as Unconfirmed.
+- Unconfirmed → route planner: no delay, never blocks (so verdicts, Road Watch, the agent's delays and Drive Watch ignore it); Route Check agent tool says `unconfirmed`; Nearby ranks it ×0.3 and tells the summary model; Top 10 excludes it; Road Watch snapshot keeps it (going grey is not an alert, expiry is); Drive Watch doesn't announce it and doesn't call it "cleared".
+- UI: grey pin, peek line, route row "Unconfirmed · last report 30 h ago · was one lane · no delay counted", Nearby row, Command Centre pill, event page grey card ("Removed automatically around …").
+- Verifier: merges into any open event still within its shelf life (was: 24 h window); an expired one is closed first and the report starts a fresh event. Real reports still merge into demo events (no duplicate pins).
+- Potholes: `potholeSize` in Claim (claim-v3) + `correctedPotholeSize` in Verdict (verify-v3), optional fields. minor → no event (report accepted, "/report/done" says "saved as a rough-road note"); medium → slow; severe → one lane; stored in `events.measurements.potholeSize`. The rough-road note lives only in the report's claim for now (not drawn on the map).
+- No schema change, no AI cost.

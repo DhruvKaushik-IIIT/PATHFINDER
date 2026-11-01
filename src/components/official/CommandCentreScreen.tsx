@@ -14,7 +14,7 @@ import Toast from "@/components/glass/Toast";
 import RiskLayer from "@/components/map/RiskLayer";
 import CrewPlanCard from "./CrewPlanCard";
 import SlopesToInspect from "./SlopesToInspect";
-import { eventTitle, STATUS_STYLE } from "@/lib/events/types";
+import { eventTitle, styleOf } from "@/lib/events/types";
 import { hoursText, roughCount, type CommandCentre, type QueueItem } from "@/lib/official/types";
 import type { AreaRisk } from "@/lib/risk/types";
 import { machinesLabel } from "@/lib/repairs/types";
@@ -207,7 +207,7 @@ export default function CommandCentreScreen() {
           ) : (
             <ol className="m-0 flex list-none flex-col gap-[10px] p-0">
               {cc.queue.map((q) => {
-                const st = STATUS_STYLE[q.status];
+                const st = styleOf(q.event); // grey when Unconfirmed (no recent reports)
                 return (
                   <li key={q.event.id}>
                     <Link

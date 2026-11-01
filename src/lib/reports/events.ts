@@ -6,8 +6,9 @@ import type { Claim, Verdict } from "../ai/schemas.ts";
 import { debrisVolumeM3, type Range } from "../clearing/estimate.ts";
 import { insert, select, update } from "../db/supabase.ts";
 import type { VerificationRecord } from "../verification/types.ts";
+import { lifecycleOf } from "../events/lifecycle.ts";
+import { closeExpired } from "../events/expire.ts";
 
-const MERGE_WINDOW_H = 24;
 const NEAR_DEG = 0.003; // ~300 m box when the report could not be snapped to a segment
 // Time-consistency (Phase 5 stretch): an old photo can't say what the road is like NOW, and a
 // contradicting report minutes after a confirmation doesn't flip the status unless it is more certain.
@@ -24,6 +25,9 @@ export interface EventRow {
   sources: { reports: number; official: number; news: number; notices: number };
   models_agreed: number | null;
   last_confirmed_at: string;
+  eta_clear?: { earliest: string; latest: string } | null;
+  measurements?: { potholeSize?: string | null } | null;
+  is_demo?: boolean | null;
 }
 
 export interface EventUpdate {
@@ -55,17 +59,28 @@ export interface EventResult {
   timeCheck?: string;
 }
 
+/** The open event at this spot that is still within its shelf life (docs/event-lifecycle.md).
+ *  One past its shelf life is closed first, so the new report starts a fresh event. */
 async function findOpenEvent(u: EventUpdate): Promise<EventRow | null> {
-  const since = new Date(Date.now() - MERGE_WINDOW_H * 3_600_000).toISOString();
-  const cols = "id,segment_id,type,status,confidence,sources,models_agreed,last_confirmed_at";
+  const cols = "id,segment_id,type,status,confidence,sources,models_agreed,last_confirmed_at,eta_clear,measurements,is_demo";
   const where = u.segmentId
     ? `segment_id=eq.${encodeURIComponent(u.segmentId)}`
     : `lat=gte.${u.lat - NEAR_DEG}&lat=lte.${u.lat + NEAR_DEG}&lng=gte.${u.lng - NEAR_DEG}&lng=lte.${u.lng + NEAR_DEG}`;
   const [row] = await select<EventRow>(
     "events",
-    `select=${cols}&${where}&resolved_at=is.null&last_confirmed_at=gte.${since}&order=last_confirmed_at.desc&limit=1`,
+    `select=${cols}&${where}&resolved_at=is.null&order=last_confirmed_at.desc&limit=1`,
   );
-  return row ?? null;
+  if (!row) return null;
+  const life = lifecycleOf({
+    type: row.type, status: row.status, lastConfirmedAt: row.last_confirmed_at, reports: row.sources?.reports,
+    official: row.sources?.official, news: row.sources?.news, etaClear: row.eta_clear, potholeSize: row.measurements?.potholeSize,
+    isDemo: row.is_demo,
+  });
+  if (life.state === "expired") {
+    await closeExpired([{ id: row.id, reason: life.reason }]).catch(() => {});
+    return null;
+  }
+  return row;
 }
 
 /** Combined confidence of one verified report: both models' views, a bonus when they agree. */
@@ -88,9 +103,18 @@ export async function applyToWorldState(u: EventUpdate): Promise<EventResult> {
   if (verdict.verdict === "reject") return { eventId: null, action: "none", reportStatus: "rejected", eventReports: 0 };
 
   const type = verdict.correctedEventType ?? claim.eventType;
-  const status = verdict.correctedStatus ?? claim.status;
+  // Potholes are common in India: size decides (docs/event-lifecycle.md). Minor = a rough road, not a disruption.
+  const potholeSize = type === "pothole" ? (verdict.correctedPotholeSize ?? claim.potholeSize ?? null) : null;
+  const status =
+    potholeSize === "minor" ? "open" : potholeSize === "medium" ? "slow" : potholeSize === "severe" ? "one_lane" : (verdict.correctedStatus ?? claim.status);
   const accepted = verdict.verdict === "accept";
   const existing = await findOpenEvent(u);
+  if (potholeSize === "minor" && !existing) {
+    return {
+      eventId: null, action: "none", reportStatus: accepted ? "accepted" : "pending", eventReports: 0,
+      timeCheck: "Minor potholes: saved as a rough-road note, not shown as a disruption",
+    };
+  }
   const now = new Date().toISOString();
   const conf = reportConfidence(u);
   // Claim numbers win (the model saw the photo + SAM); SAM fills what the claim leaves out.
@@ -102,7 +126,7 @@ export async function applyToWorldState(u: EventUpdate): Promise<EventResult> {
     blockedPct: cm.blockedPct ?? sam.blockedPct ?? null,
     roadTotalWidthM: sam.roadTotalWidthM ?? null,
   };
-  const measurements = { ...measured, debrisVolumeM3: debrisVolumeM3(type, measured) };
+  const measurements = { ...measured, debrisVolumeM3: debrisVolumeM3(type, measured), ...(potholeSize && { potholeSize }) };
 
   const timeline = (eventId: string, text: string) =>
     insert("event_timeline", {

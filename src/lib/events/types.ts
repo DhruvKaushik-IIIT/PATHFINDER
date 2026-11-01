@@ -24,6 +24,21 @@ export interface MapEvent {
   gapM?: { min: number; max: number } | null;
   /** Newest photo of the spot (ISO). */
   photoAt?: string | null;
+  /** Shelf life (docs/event-lifecycle.md): "unconfirmed" = grey, no route delay, no new alerts. */
+  lifecycle?: { state: "active" | "unconfirmed" | "expired"; reason: string | null; unconfirmedAt: string | null; expiresAt: string | null };
+}
+
+/** Grey "Unconfirmed" style — the status word stays, the colour goes (7.2: never colour alone). */
+export const UNCONFIRMED_STYLE = { dot: "#8E8E93", bg: "rgba(142,142,147,0.16)", ink: "#48484A", word: "Unconfirmed" };
+export const isUnconfirmed = (e: { lifecycle?: MapEvent["lifecycle"] }) => e.lifecycle?.state === "unconfirmed";
+/** Status style, or grey "Unconfirmed" when the event is past half its shelf life. */
+export function styleOf(e: { status: EventStatus; lifecycle?: MapEvent["lifecycle"] }) {
+  return isUnconfirmed(e) ? UNCONFIRMED_STYLE : (STATUS_STYLE[e.status] ?? STATUS_STYLE.unknown);
+}
+/** "Unconfirmed · last report 2 d ago · was one lane" */
+export function unconfirmedLine(e: { status: EventStatus; lastConfirmedAt: string }, now = Date.now()): string {
+  const was = (STATUS_STYLE[e.status] ?? STATUS_STYLE.unknown).word.toLowerCase();
+  return `Unconfirmed · last report ${ago(e.lastConfirmedAt, now)} · was ${was}`;
 }
 
 // CLAUDE.md 7.2 — status is ALWAYS word + colour.

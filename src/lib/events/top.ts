@@ -107,7 +107,8 @@ export async function topAcrossHimachal(limit = 10, now = Date.now()): Promise<T
   const watching = new Map<string, number>();
   for (const t of trips) for (const x of t.route_cache?.events ?? []) watching.set(x.id, (watching.get(x.id) ?? 0) + 1);
 
-  const live = rows.filter((r) => r.type !== "clear" && r.status !== "open");
+  // Top 10 = confirmed disruptions only: Unconfirmed / expired events (shelf life) don't count.
+  const live = rows.filter((r) => r.type !== "clear" && r.status !== "open" && toMapEvent(r).lifecycle?.state === "active");
   const counts = { closed: 0, oneLane: 0, slow: 0, other: 0 };
   for (const r of live) {
     if (r.status === "closed") counts.closed++;
