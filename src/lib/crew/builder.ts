@@ -15,6 +15,7 @@ import type { QueueItem } from "../official/types.ts";
 import { eventTitle, type EventStatus } from "../events/types.ts";
 import { DIGGING, machinesText, peopleText, siteNeeds, SKILL_WORD, type MachineKind, type Needs, type Skill } from "./needs.ts";
 
+type UpdRow = { event_id: string; pct_cleared: number | null; created_at: string; ai_check: { note?: { by: string; text: string; en: string | null } | null } | null };
 type NeedsMeasurements = Parameters<typeof siteNeeds>[0]["measurements"];
 
 const ROAD_FACTOR = 1.4;
@@ -317,6 +318,8 @@ export interface CrewBoardItem {
   arrivedAt: string | null;
   pct: number | null;
   lastUpdateAt: string | null;
+  /** Newest voice note from the site (≤12 h): who + English (or as spoken). */
+  note: { by: string; text: string; at: string } | null;
 }
 export interface ToStaffItem {
   eventId: string;
@@ -347,12 +350,14 @@ export async function crewBoard(official: Official, queue: QueueItem[]): Promise
   const [members, updates, free] = await Promise.all([
     ids.length ? select<{ crew_id: string }>("workers", `select=crew_id&crew_id=in.(${ids.join(",")})`) : Promise.resolve([] as { crew_id: string }[]),
     evIds.length
-      ? select<{ event_id: string; pct_cleared: number | null; created_at: string }>("official_updates", `select=event_id,pct_cleared,created_at&event_id=in.(${evIds.join(",")})&order=created_at.desc`)
-      : Promise.resolve([] as { event_id: string; pct_cleared: number | null; created_at: string }[]),
+      ? select<UpdRow>("official_updates", `select=event_id,pct_cleared,created_at,ai_check&event_id=in.(${evIds.join(",")})&order=created_at.desc`)
+      : Promise.resolve([] as UpdRow[]),
     select<{ id: string }>("workers", `select=id&on_duty=is.true&crew_id=is.null&district=eq.${encodeURIComponent(official.district.name)}&is_demo=is.${official.isDemo}`),
   ]);
   const active: CrewBoardItem[] = crews.map((c) => {
     const u = updates.find((x) => x.event_id === c.current_event_id);
+    const withNote = updates.find((x) => x.event_id === c.current_event_id && x.ai_check?.note && Date.now() - new Date(x.created_at).getTime() < 12 * 3_600_000);
+    const n = withNote?.ai_check?.note;
     return {
       id: c.id,
       name: c.name,
@@ -367,6 +372,7 @@ export async function crewBoard(official: Official, queue: QueueItem[]): Promise
       arrivedAt: c.arrived_at,
       pct: u?.pct_cleared ?? null,
       lastUpdateAt: u?.created_at ?? null,
+      note: n && withNote ? { by: n.by, text: n.en ?? n.text, at: withNote.created_at } : null,
     };
   });
   const staffed = new Set(evIds);
