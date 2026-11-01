@@ -5,6 +5,7 @@
 import { transcribe } from "../ai/router.ts";
 import { debrisVolumeM3 } from "../clearing/estimate.ts";
 import { insert, publicUrl, select, update, upload } from "../db/supabase.ts";
+import { releaseCrew } from "../crew/builder.ts";
 import { eventTitle, type EventStatus } from "../events/types.ts";
 import { clock } from "../geo/format.ts";
 import { preparePhoto, processPhoto, type PreparedPhoto, type ProcessedPhoto } from "../reports/processPhoto.ts";
@@ -208,7 +209,10 @@ export async function postFieldUpdate(official: Official, input: FieldInput): Pr
     sources: { ...sources, official: sources.official + 1 },
     ...(resolved && { resolved_at: now.toISOString() }),
   });
-  if (resolved && crew) await update("crews", `id=eq.${crew.id}`, { current_event_id: null, available: true, status: "done", done_at: now.toISOString() });
+  if (resolved && crew) {
+    await update("crews", `id=eq.${crew.id}`, { current_event_id: null, available: true, status: "done", done_at: now.toISOString() });
+    await releaseCrew(crew.id, ev); // assembled crews go back to the pool (Option B)
+  }
 
   const parts = [
     resolved ? "Fully open" : `${input.pctCleared}% cleared · ${FIELD_STATUS[input.status].label.toLowerCase()}`,

@@ -131,7 +131,7 @@ export default function LoginScreen() {
             className="flex min-h-[48px] flex-col items-center justify-center rounded-[14px] bg-accent-tint px-3 py-1.5 text-accent-tint-ink disabled:opacity-60"
           >
             <span className="text-[16px] font-semibold">Try as on-site crew (demo)</span>
-            <span className="text-[12px]">Rajesh Thakur · Crew A supervisor at the Aut slide</span>
+            <span className="text-[12px]">Neelam Thakur · supervisor, on duty near Mandi</span>
           </button>
           <p className="m-0 text-center text-[12px] leading-[1.45] text-ink-2">
             Demo accounts <span className="whitespace-nowrap font-mono">PWD-MANDI-DEMO</span> / <span className="whitespace-nowrap font-mono">himachal-demo</span> and{" "}

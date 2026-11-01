@@ -30,7 +30,7 @@ export interface CrewInfo {
 
 export interface CommandCentre {
   official: { name: string; org: string; role: string; district: District };
-  stats: { active: number; crewsFree: number; crewsTotal: number; vehiclesHit: number; watching: number };
+  stats: { active: number; /** On-duty field workers not in a crew / all on duty (Option B). */ crewsFree: number; crewsTotal: number; vehiclesHit: number; watching: number };
   queue: QueueItem[];
   crews: CrewInfo[];
 }

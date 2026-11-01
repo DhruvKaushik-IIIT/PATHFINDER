@@ -89,13 +89,18 @@ async function watchingCount(d: District): Promise<number> {
 export async function commandCentre(official: { name: string; org: string; role: string; district: District }): Promise<CommandCentre> {
   const d = official.district;
   const crews = await crewsOf(d);
-  const [queue, watching] = await Promise.all([rankedQueue(d, crews), watchingCount(d).catch(() => 0)]);
+  const [queue, watching, onDuty] = await Promise.all([
+    rankedQueue(d, crews),
+    watchingCount(d).catch(() => 0),
+    // Option B: field workers on duty in the district (free = not in a crew yet).
+    select<{ crew_id: string | null }>("workers", `select=crew_id&on_duty=is.true&district=eq.${encodeURIComponent(d.name)}`).catch(() => []),
+  ]);
   return {
     official,
     stats: {
       active: queue.filter((q) => q.status !== "open").length,
-      crewsFree: crews.filter((c) => c.available && !c.currentEventId).length,
-      crewsTotal: crews.length,
+      crewsFree: onDuty.filter((w) => !w.crew_id).length,
+      crewsTotal: onDuty.length,
       vehiclesHit: queue.reduce((sum, q) => sum + q.vehiclesHit, 0),
       watching,
     },

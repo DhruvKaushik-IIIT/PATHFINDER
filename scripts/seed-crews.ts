@@ -225,6 +225,11 @@ const machines = M.map(([code, kind, depot, crew], i) => {
   };
 });
 
+// The judges' crew demo account (DEMO_CREW): Neelam Thakur, free and on duty near Kamand, ~6 km from the
+// Kataula slide → the office's crew builder picks her as supervisor, and her phone gets the job.
+const neelam = workers.find((w) => w.name === "Neelam Thakur")!;
+Object.assign(neelam, { on_duty: true, duty_lat: 31.7752, duty_lng: 76.9861, duty_updated_at: ago(3) });
+
 await req("POST", "users?on_conflict=id", users, "resolution=merge-duplicates,return=minimal");
 await req("POST", "workers?on_conflict=id", workers, "resolution=merge-duplicates,return=minimal");
 await req("POST", "machines?on_conflict=id", machines, "resolution=merge-duplicates,return=minimal");
