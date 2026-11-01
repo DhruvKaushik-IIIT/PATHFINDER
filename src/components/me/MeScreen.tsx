@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import Toast from "@/components/glass/Toast";
 import type { MeProfile } from "@/lib/scout/types";
 import { pingOnce, useLocationPing } from "./useLocationPing";
+import MyVehicleCard from "@/components/fit/MyVehicleCard";
 
 const MapView = dynamic(() => import("@/components/map/MapView"), {
   ssr: false,
@@ -228,6 +229,8 @@ export default function MeScreen() {
                 </button>
               </div>
             </div>
+
+            <MyVehicleCard />
 
             <Link href="/official/login" className="flex min-h-[44px] items-center justify-center gap-1.5 text-[15px] font-semibold text-link no-underline">
               <Lock size={14} aria-hidden /> Road crew or official? Sign in
