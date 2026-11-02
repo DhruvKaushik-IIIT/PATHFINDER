@@ -49,3 +49,10 @@ _Format: ID · date · area · steps · expected · actual · likely cause · se
 - **Likely cause:** claim writer (Baseten, claim-v3) ignores "(Devanagari)" sometimes; unlike the fit check there is no code check for Devanagari characters on `summaryHi` in `writeClaim` (schemas.ts:34 is only a description).
 - **Severity:** minor.
 - **Status: FIXED (Nov 2)** — `ensureHindi()` in `src/lib/ai/router.ts`: a Hindi summary with <5 Devanagari letters is re-translated from the English sentence by a small job (`translate_hindi`, Meta Spark → Baseten, prompt hindi-v1, zod refine = Devanagari), in parallel with the verifier; if both fail the Hindi line is left empty (hidden) instead of wrong. Used for road claims and slope readings. Not a JSON-schema `pattern` (that made Baseten answer "स" in Phase 6C). Live: the very next Baseten claim was Latin again → repaired in 2.6 s, $0.003, total report 19.5 s. Existing open events repaired once (Mandi test report, Archhandi demo).
+
+### B4 · Nov 2 · Report · a downloaded internet photo becomes a "verified" landslide
+- **Steps:** Dhruv (at home in Mandi) picked a random landslide photo downloaded from the internet from the library on /report (location: Samkhetar road, Mandi).
+- **Expected:** a photo that wasn't taken here and now should not put a verified pin on the map.
+- **Actual:** accepted, "2 AI models agree", 95%, event `1fd7d704…` "Landslide at Mandi · one lane" on `samkhetar-road-62229238-0` (1 report, real data, still open).
+- **Likely cause:** (1) both models only judge "is this a landslide photo", not "was it taken here, now"; (2) `src/lib/images/takenAt.ts` falls back to the file's last-modified time when there is no EXIF date, and a downloaded file's last-modified = download time → the time-consistency check sees a "fresh" photo; (3) one report alone is enough to create an active pin; (4) no one can flag a pin as fake (only "Still there? No", which needs you within 2 km).
+- **Severity:** major (trust / demo credibility). Options discussed with Dhruv, not decided yet.
