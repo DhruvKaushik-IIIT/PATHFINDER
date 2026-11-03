@@ -133,6 +133,16 @@ flowchart LR
 </tr>
 </table>
 
+### The loop, live — a crew update reaches every traveller
+
+<table>
+<tr>
+<td width="33%" align="center"><img src="docs/screenshots/12-field-update.jpg" width="240" alt="Crew posts a field update"/><br/><b>1 · Crew posts from the site</b><br/><sub>"One lane, 60% cleared". AI check: "photo shows debris down ~75% — consistent with 60%".</sub></td>
+<td width="33%" align="center"><img src="docs/screenshots/13-event-after-crew-update.jpg" width="240" alt="Event updated for travellers"/><br/><b>2 · The event updates for everyone</b><br/><sub>Closed → one lane open, new road-left measurement, clearing window and the crew's update in English + Hindi.</sub></td>
+<td width="33%" align="center"><img src="docs/screenshots/14-road-watch-alert.jpg" width="240" alt="Road Watch alert"/><br/><b>3 · Travellers watching the trip get an alert</b><br/><sub>Road Watch re-plans with Muse Wonder: "Kataula is now one lane (was closed)…" + a new departure time.</sub></td>
+</tr>
+</table>
+
 ### For travellers
 
 <table>
@@ -144,7 +154,11 @@ flowchart LR
 <tr>
 <td align="center"><img src="docs/screenshots/04-annotated-photo.jpg" width="240" alt="AI-annotated photo"/><br/><b>AI-annotated evidence</b><br/><sub>Labels are drawn by code on a copy — the photo itself is never altered. Faces and plates blurred.</sub></td>
 <td align="center"><img src="docs/screenshots/07-drive-watch.jpg" width="240" alt="Drive Watch"/><br/><b>Drive Watch</b><br/><sub>Runs next to Google Maps: speaks hazards 5 km and 1 km ahead in English or Hindi, live Road Watch changes, keeps the screen on.</sub></td>
-<td align="center"><img src="docs/screenshots/08-nearby.jpg" width="240" alt="Nearby"/><br/><b>Nearby</b><br/><sub>Everything within 5–50 km, ranked, with a one-line AI summary and a rain-risk layer.</sub></td>
+<td align="center"><img src="docs/screenshots/08-nearby.jpg" width="240" alt="Nearby"/><br/><b>Nearby</b><br/><sub>Everything within 5–50 km, ranked, with a one-line AI summary.</sub></td>
+</tr>
+<tr>
+<td align="center"><img src="docs/screenshots/15-rain-risk-replay.jpg" width="240" alt="Rain risk"/><br/><b>Rain risk</b><br/><sub>Forecast rain × recent slides → purple risk areas. Shown here: a replay of a real monsoon day (13 Aug 2025) around Kullu.</sub></td>
+<td></td><td></td>
 </tr>
 </table>
 
@@ -253,7 +267,7 @@ Next.js 15 (App Router) + TypeScript on **Vercel** · **Supabase** (Postgres + P
 3. **District office:** go to `/official/login` → **PWD / district office** → choose **Mandi** → Department ID **`PWD-MANDI-DEMO`**, password **`himachal-demo`**. Scroll to the crew card → **Landslide at Kataula · Build crew** → **Approve & send**.
 4. **On-site crew:** sign out → `/official/login` → **On-site crew member** → Crew ID **`CREW-MANDI-DEMO`**, password **`himachal-crew`** (Neelam Thakur, a supervisor near Kataula). The job you just sent is waiting under **My job**.
 5. **Close the loop:** as Neelam, tap **I've arrived** → **Post progress update** → add any photo, choose **One lane**, 60% → **Post**. Now open **Mandi → Manali** as a traveller (another browser or a private window): Kataula shows *one lane*, with a **repair crew working** card and the crew's update on the event page.
-6. **Slope Sentinel:** on the map, tap a purple ⛰ marker → warning signs read from the hillside photo, rain in the next 24 h, slides nearby, advice in English/Hindi. Add `?replay=1` to `/route` or `/nearby` to replay a real monsoon day's rain.
+6. **Slope Sentinel:** on the map, tap a purple ⛰ marker → warning signs read from the hillside photo, rain in the next 24 h, slides nearby, advice in English/Hindi. To see rain risk on a dry day, open [Nearby around Kullu with a replay of a real monsoon day](https://pathfinder1-ten.vercel.app/nearby?lat=31.957&lng=77.109&name=Kullu&r=25&replay=1).
 7. **Road Watch:** on a route, switch on **Watch this trip** → when an event on it changes (step 5 does this), the 🔔 on the home screen gets an alert with the new plan.
 
 More to poke at: **Nearby** (radius 5–50 km + AI summary) · **Share alert card** on any event · [`/verification`](https://pathfinder1-ten.vercel.app/verification) (how often the two AI models agree) · **Me** (scout points and badges) · `/himachal` (top 10 problems across the state).
