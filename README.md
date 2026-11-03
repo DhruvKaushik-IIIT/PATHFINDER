@@ -128,8 +128,18 @@ flowchart LR
 </tr>
 <tr>
 <td align="center"><img src="docs/screenshots/05-vehicle-fit.jpg" width="240" alt="Can my vehicle cross"/><br/><b>Can my vehicle cross?</b><br/><sub>Vehicle width from a spec table, gap from SAM measurements, maths in code. Two models look at road + vehicle photos and can only make the verdict <i>stricter</i>.</sub></td>
-<td align="center"><img src="docs/screenshots/06-slope-sentinel.jpg" width="240" alt="Slope Sentinel"/><br/><b>Slope Sentinel</b><br/><sub>Photos of the hillside <i>above</i> the road, read like a field geologist (cracks, seepage, loose rock) × rain forecast × slide history → watch / elevated / high. Advice only — never closes a road.</sub></td>
+<td align="center"><img src="docs/screenshots/06-slope-sentinel.jpg" width="240" alt="Slope Sentinel"/><br/><b>Slope Sentinel</b><br/><sub>Photos of the hillside <i>above</i> the road, read like a field geologist (cracks, seepage, loose rock) × rain forecast × slide history → watch / elevated / high. Advice only — never closes a road. <a href="#slope-sentinel-in-depth--warning-before-the-hill-comes-down">More below ↓</a></sub></td>
 <td align="center"><sub><b>Field updates from the site</b> — progress photo (required) + % cleared + Hindi voice note; SAM checks the photo against the last one, mismatches are flagged, never hidden. <b>See the live loop below ↓</b></sub></td>
+</tr>
+</table>
+
+### Slope Sentinel, in depth — warning before the hill comes down
+
+<table>
+<tr>
+<td width="33%" align="center"><img src="docs/screenshots/16-slope-why-what-to-do.jpg" width="240" alt="Slope Sentinel reasons and advice"/><br/><b>Why, and what to do</b><br/><sub>Muse Wonder weighs the photo readings, how the slope changed since the last photo, the rain forecast and slides nearby → plain advice in English or Hindi.</sub></td>
+<td width="33%" align="center"><img src="docs/screenshots/17-slope-two-models-timeline.jpg" width="240" alt="Checked by two models, with timeline"/><br/><b>Two Meta models, every photo</b><br/><sub>Muse Spark Open reads the hillside, Muse Spark 1.3 checks it on its own. The timeline shows the risk rising as new photos arrive ("loose-rock area ~1.9× larger than 20 h ago").</sub></td>
+<td width="33%" align="center"><img src="docs/screenshots/18-slope-alerts-on-trip.jpg" width="240" alt="Slope alerts on a watched trip"/><br/><b>Reaches travellers on that road</b><br/><sub>When a slope on a watched trip rises to elevated or high, Road Watch sends an alert, next to the usual road changes.</sub></td>
 </tr>
 </table>
 
