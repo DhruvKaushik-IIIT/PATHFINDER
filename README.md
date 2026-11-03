@@ -8,7 +8,9 @@
 
 **Waze tells you traffic is slow. Pathfinder tells you *why*, whether *your* car fits through, and when the road crew will have it open.**
 
-[**▶ Watch the 3-minute demo**](https://youtu.be/VIDEO_ID) · [**Open the live app**](https://pathfinder1-ten.vercel.app) · [Try it as a judge](#-try-it--a-judges-path-5-minutes)
+[**▶ Watch the 3-minute demo**](https://www.youtube.com/watch?v=UiOhGkm0CcI) · [**Open the live app**](https://pathfinder1-ten.vercel.app) · [Try it as a judge](#-try-it--a-judges-path-5-minutes)
+
+<a href="https://www.youtube.com/watch?v=UiOhGkm0CcI"><img src="docs/screenshots/video-thumbnail.jpg" width="720" alt="Watch the Pathfinder demo video on YouTube"/></a>
 
 ![Meta Muse Spark Open](https://img.shields.io/badge/Meta-Muse_Spark_Open_(open_weights)-0668E1)
 ![Muse Spark 1.3](https://img.shields.io/badge/Meta-Muse_Spark_1.3-0668E1)
