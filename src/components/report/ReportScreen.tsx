@@ -38,6 +38,8 @@ const NO_GPS = "We couldn't get your location. Choose where your photo should go
 const OUTSIDE = "You seem to be outside Himachal. Pathfinder checks Himachal roads, so place your report on one.";
 
 type Mode = "photo" | "slope";
+// B4: in-app camera shot vs a photo picked from the library (needs a camera date to count).
+type Origin = "camera" | "library";
 
 export default function ReportScreen() {
   const router = useRouter();
@@ -65,7 +67,7 @@ export default function ReportScreen() {
   const [placed, setPlaced] = useState<PickedSpot | null>(null);
   const [picker, setPicker] = useState<string | null>(null);
   const [offRoad, setOffRoad] = useState(false);
-  const pending = useRef<{ photo: Blob; taken: string | null } | null>(null);
+  const pending = useRef<{ photo: Blob; taken: string | null; origin: Origin } | null>(null);
 
   // Rear camera.
   useEffect(() => {
@@ -166,10 +168,10 @@ export default function ReportScreen() {
 
   useEffect(() => () => recorder.current?.cancel(), []);
 
-  async function send(photo: Blob, taken: string | null = null, spot: PickedSpot | null = placed) {
+  async function send(photo: Blob, taken: string | null = null, spot: PickedSpot | null = placed, origin: Origin = "camera") {
     // No usable GPS for a Himachal road → ask for a spot, then send this same photo.
     if (!spot && (!loc || !inHp(loc))) {
-      pending.current = { photo, taken };
+      pending.current = { photo, taken, origin };
       setPicker(loc ? OUTSIDE : NO_GPS);
       return;
     }
@@ -185,6 +187,7 @@ export default function ReportScreen() {
     const scout = new URLSearchParams(window.location.search).get("scout");
     if (scout && !spot) form.append("scout", scout);
     if (taken) form.append("takenAt", taken);
+    form.append("origin", origin);
     if (mode === "slope") form.append("kind", "slope");
     try {
       const res = await fetch("/api/reports", { method: "POST", body: form });
@@ -209,7 +212,7 @@ export default function ReportScreen() {
     setLocLabel(`${s.label} · placed on map (demo)`);
     const p = pending.current;
     pending.current = null;
-    if (p) void send(p.photo, p.taken, s);
+    if (p) void send(p.photo, p.taken, s, p.origin);
   }
 
   function shoot() {
@@ -350,7 +353,7 @@ export default function ReportScreen() {
               const f = e.target.files?.[0];
               e.target.value = "";
               // Library photo: remember when it was taken (time-consistency check on the server).
-              if (f) void Promise.all([shrinkPhoto(f), takenAt(f)]).then(([b, t]) => send(b, t));
+              if (f) void Promise.all([shrinkPhoto(f), takenAt(f)]).then(([b, t]) => send(b, t, placed, "library"));
             }}
           />
         </div>

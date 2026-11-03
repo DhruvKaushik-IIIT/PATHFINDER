@@ -29,6 +29,8 @@ export interface SubmitInput {
   scoutRequestId?: string | null;
   /** When a library photo was taken (EXIF / file time, sent by the browser). Camera shots: null = now. */
   takenAt?: string | null;
+  /** B4: "camera" = shot in /report; "library" = picked from the phone (counts only with a camera date = takenAt). */
+  origin?: "camera" | "library" | null;
   /** Placed on the map by someone not at the spot ("Pick a spot", B1): same AI pipeline, but demo data,
    *  no points, never touches real events. */
   placed?: boolean;
@@ -194,12 +196,22 @@ export async function submitReport(input: SubmitInput): Promise<SubmitResult> {
     return [];
   });
 
+  // B4: an upload must show it was taken here and now. Map-placed (demo) reports are exempt: judges far away
+  // have no Himachal photos of their own.
+  const unverifiedUpload = placed
+    ? null
+    : input.origin === "library" && !input.takenAt
+      ? "Uploaded photo has no camera data"
+      : verdict?.looksDownloaded
+        ? `Photo looks downloaded or forwarded${verdict.downloadSigns ? ` (${verdict.downloadSigns})` : ""}`
+        : null;
+
   let ev: EventResult = { eventId: null, action: "none", reportStatus: "pending", eventReports: 0 };
   if (here && verdict) {
     ev = await applyToWorldState({
       claim: here, verdict, verifiedBy: verifiedBy!, modelsAgreed,
       segmentId: snap.segment?.id ?? null, placeName: snap.placeName, lat, lng,
-      reportId: id, photoUrl: pubUrl, sam: p.measurements, verification, photoAgeH, placed,
+      reportId: id, photoUrl: pubUrl, sam: p.measurements, verification, photoAgeH, placed, unverifiedUpload,
     });
   }
 
@@ -226,7 +238,7 @@ export async function submitReport(input: SubmitInput): Promise<SubmitResult> {
 
   // Placed on the map: demo report → no points (the leaderboard is for reports made at the spot).
   const scoutBonus = !placed && input.scoutRequestId && ev.reportStatus !== "rejected" ? await fulfilScoutRequest(input.scoutRequestId, id) : 0;
-  const points = placed ? 0 : pointsFor(ev, verdict) + scoutBonus;
+  const points = placed || unverifiedUpload ? 0 : pointsFor(ev, verdict) + scoutBonus;
   if (input.userId && !placed) await creditUser(input.userId, points, { lat, lng }).catch((err: Error) => console.warn("[reports] points failed:", err.message));
   await Promise.all([
     update("reports", `id=eq.${id}`, { status: ev.reportStatus, event_id: ev.eventId, points_awarded: points }),

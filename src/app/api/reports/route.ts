@@ -31,6 +31,8 @@ const Input = z.object({
   kind: z.enum(["road", "slope"]).default("road"),
   // "Pick a spot" (B1): someone not at the spot placed the report on the map → demo data, no points.
   placed: z.literal("1").optional(),
+  // B4: where the photo came from (library photos need a camera date to count).
+  origin: z.enum(["camera", "library"]).optional(),
 });
 
 const bad = (error: string, status = 400) => NextResponse.json({ ok: false, error }, { status });
@@ -44,7 +46,7 @@ export async function POST(req: Request) {
   } catch {
     return bad("expected multipart/form-data");
   }
-  const parsed = Input.safeParse({ lat: form.get("lat"), lng: form.get("lng"), text: form.get("text") ?? undefined, scout: form.get("scout") ?? undefined, takenAt: form.get("takenAt") ?? undefined, kind: form.get("kind") ?? undefined, placed: form.get("placed") ?? undefined });
+  const parsed = Input.safeParse({ lat: form.get("lat"), lng: form.get("lng"), text: form.get("text") ?? undefined, scout: form.get("scout") ?? undefined, takenAt: form.get("takenAt") ?? undefined, kind: form.get("kind") ?? undefined, placed: form.get("placed") ?? undefined, origin: form.get("origin") ?? undefined });
   if (!parsed.success) return bad(`invalid input: ${parsed.error.issues.map((i) => i.path.join(".")).join(", ")}`);
   const photo = form.get("photo");
   if (!(photo instanceof File) || !photo.type.startsWith("image/")) return bad("photo (image file) is required");
@@ -98,6 +100,7 @@ export async function POST(req: Request) {
       userId,
       scoutRequestId: placed ? null : scout ?? null,
       placed,
+      origin: parsed.data.origin ?? null,
       takenAt: takenAt ?? null,
       photo: prepared,
       lat,
