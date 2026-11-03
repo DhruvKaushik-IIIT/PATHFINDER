@@ -8,7 +8,7 @@
 
 **Waze tells you traffic is slow. Pathfinder tells you *why*, whether *your* car fits through, and when the road crew will have it open.**
 
-[**▶ Watch the 3-minute demo**](https://youtu.be/VIDEO_ID) · [**Open the live app**](https://pathfinder1-ten.vercel.app) · [Try it as a judge](#-try-it-in-2-minutes)
+[**▶ Watch the 3-minute demo**](https://youtu.be/VIDEO_ID) · [**Open the live app**](https://pathfinder1-ten.vercel.app) · [Try it as a judge](#-try-it--a-judges-path-5-minutes)
 
 ![Meta Muse Spark Open](https://img.shields.io/badge/Meta-Muse_Spark_Open_(open_weights)-0668E1)
 ![Muse Spark 1.3](https://img.shields.io/badge/Meta-Muse_Spark_1.3-0668E1)
@@ -244,7 +244,7 @@ Next.js 15 (App Router) + TypeScript on **Vercel** · **Supabase** (Postgres + P
 
 ---
 
-## 🚀 Try it in 2 minutes
+## 🚀 Try it — a judge's path (5 minutes)
 
 **Live app:** https://pathfinder1-ten.vercel.app — best on a phone, or a narrow browser window.
 
@@ -252,6 +252,11 @@ Next.js 15 (App Router) + TypeScript on **Vercel** · **Supabase** (Postgres + P
 2. **Report** (works from anywhere): tap **Report** → when it says *Outside Himachal*, use **Pick a spot** to drop the report on a demo road → upload any road photo.
 3. **District office:** go to `/official/login` → **PWD / district office** → choose **Mandi** → Department ID **`PWD-MANDI-DEMO`**, password **`himachal-demo`**. Scroll to the crew card → **Landslide at Kataula · Build crew** → **Approve & send**.
 4. **On-site crew:** sign out → `/official/login` → **On-site crew member** → Crew ID **`CREW-MANDI-DEMO`**, password **`himachal-crew`** (Neelam Thakur, a supervisor near Kataula). The job you just sent is waiting under **My job**.
+5. **Close the loop:** as Neelam, tap **I've arrived** → **Post progress update** → add any photo, choose **One lane**, 60% → **Post**. Now open **Mandi → Manali** as a traveller (another browser or a private window): Kataula shows *one lane*, with a **repair crew working** card and the crew's update on the event page.
+6. **Slope Sentinel:** on the map, tap a purple ⛰ marker → warning signs read from the hillside photo, rain in the next 24 h, slides nearby, advice in English/Hindi. Add `?replay=1` to `/route` or `/nearby` to replay a real monsoon day's rain.
+7. **Road Watch:** on a route, switch on **Watch this trip** → when an event on it changes (step 5 does this), the 🔔 on the home screen gets an alert with the new plan.
+
+More to poke at: **Nearby** (radius 5–50 km + AI summary) · **Share alert card** on any event · [`/verification`](https://pathfinder1-ten.vercel.app/verification) (how often the two AI models agree) · **Me** (scout points and badges) · `/himachal` (top 10 problems across the state).
 
 Demo accounts only change demo data (fictional people and machines); real travellers never see it.
 
