@@ -1,4 +1,4 @@
-// Server-only: tools for the Crew Dispatch agent (CLAUDE.md 6.4). All plain code over the ranked queue,
+// Server-only: tools for the Crew Dispatch agent (SEQUENCE.md 6.4). All plain code over the ranked queue,
 // the crews and the dispatch simulator — the model only chooses and explains.
 import type OpenAI from "openai";
 import { z } from "zod";

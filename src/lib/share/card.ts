@@ -1,7 +1,7 @@
 // Server-only: build the shareable alert card for an event (frame 11). Text = code (exact EN + HI from
 // the verified event); illustration = Muse Image, generated once per event type + status and cached in
 // Storage (≈ a few dozen images ever, $0.01 each). Muse Image down → an illustration drawn by code.
-// Evidence photos are never sent to or changed by Muse Image (CLAUDE.md 6.2 rule 4).
+// Evidence photos are never sent to or changed by Muse Image (SEQUENCE.md 6.2 rule 4).
 import sharp from "sharp";
 import { alertArt } from "../ai/router.ts";
 import { ALERT_ART_PROMPT_VERSION, alertArtPrompt } from "../ai/prompts/alertArt.ts";

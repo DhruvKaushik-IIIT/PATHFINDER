@@ -1,4 +1,4 @@
-// Event pin (CLAUDE.md 7.6): status colour, white ring, shadow. A real <button> so it's tappable + labelled.
+// Event pin (SEQUENCE.md 7.6): status colour, white ring, shadow. A real <button> so it's tappable + labelled.
 import { isUnconfirmed, styleOf, TYPE_WORD, type MapEvent } from "@/lib/events/types";
 
 export default function EventPin({ event, selected, onClick }: { event: MapEvent; selected?: boolean; onClick?: () => void }) {

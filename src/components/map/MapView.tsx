@@ -1,6 +1,6 @@
 "use client";
 
-// Full-screen base map (CLAUDE.md 7.6): MapLibre + OpenFreeMap tiles restyled to Glass,
+// Full-screen base map (SEQUENCE.md 7.6): MapLibre + OpenFreeMap tiles restyled to Glass,
 // faint dashed HP boundary, our road-segment layer, and the my-location dot.
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { FeatureCollection, LineString } from "geojson";

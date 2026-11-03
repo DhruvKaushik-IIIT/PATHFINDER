@@ -1,4 +1,4 @@
-// Server-only: Scout requests (CLAUDE.md 6.2 rule 6, Phase 5). Plain code, no AI.
+// Server-only: Scout requests (SEQUENCE.md 6.2 rule 6, Phase 5). Plain code, no AI.
 // A request = "we need a fresh photo of this road segment". It comes from the Investigator
 // (request_scout_photo) or from the data-gap scan (demand × gap: watched trips through an event
 // whose evidence is old). It is sent as an alert to opted-in scouts who are nearby AND stationary:

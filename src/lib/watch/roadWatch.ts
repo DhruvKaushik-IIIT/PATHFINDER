@@ -1,4 +1,4 @@
-// Server-only: watched trips + Road Watch (CLAUDE.md 5.4 budget rule: event-driven, NOT a timer on
+// Server-only: watched trips + Road Watch (SEQUENCE.md 5.4 budget rule: event-driven, NOT a timer on
 // the AI). Plain code re-plans the route (OSRM + events, no AI) and compares the disruptions on the
 // best route with the last snapshot. Only when something changed does the Route Check agent re-plan
 // (same tiers as /route: Spark for one issue, Wonder for several/closures) → an alert for the owner.

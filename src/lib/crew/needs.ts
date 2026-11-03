@@ -1,6 +1,6 @@
 // Client-safe, plain code (no AI): what a site needs — machines and people by skill — worked out from
 // the event type, status and the measured debris volume (SAM photos → clearing/estimate.ts).
-// The AI may explain this plan later, but it never sets these numbers (CLAUDE.md 6.2).
+// The AI may explain this plan later, but it never sets these numbers (SEQUENCE.md 6.2).
 //
 // Rules of thumb (hill-road PWD practice, rough):
 //  - A backhoe/excavator moves ~12–30 m³/h of slide debris on a narrow road (same as estimate.ts).

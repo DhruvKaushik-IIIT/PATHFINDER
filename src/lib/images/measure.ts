@@ -1,4 +1,4 @@
-// Server-only: turn SAM masks into road measurements (CLAUDE.md 6.2 rules 2–3).
+// Server-only: turn SAM masks into road measurements (SEQUENCE.md 6.2 rules 2–3).
 // Every number is a range. Metres come only from a reference object in the frame
 // (vehicle, excavator) or the documented two-lane assumption (~7 m); otherwise "unknown".
 //

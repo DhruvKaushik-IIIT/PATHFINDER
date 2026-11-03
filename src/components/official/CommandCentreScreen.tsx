@@ -1,6 +1,6 @@
 "use client";
 
-// Frame 14 Command Centre — PHONE layout (CLAUDE.md 7.5; ControlRoom.dc.html is only the style source):
+// Frame 14 Command Centre — PHONE layout (SEQUENCE.md 7.5; ControlRoom.dc.html is only the style source):
 // map base with the district's events + rain-risk layer, floating glass header (logo, org, Sign out),
 // a row of 4 glass stat tiles, and a bottom sheet with the priority queue ranked by impact.
 import { ChevronRight, LogOut, ShieldCheck } from "lucide-react";

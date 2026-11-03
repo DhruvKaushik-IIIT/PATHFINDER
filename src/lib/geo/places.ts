@@ -1,5 +1,5 @@
 // Server-only: place search = our HP places (treks, passes, villages Photon misses) + Photon
-// (all of India, biased to Himachal) — CLAUDE.md section 3. No AI. Cached in memory.
+// (all of India, biased to Himachal) — SEQUENCE.md section 3. No AI. Cached in memory.
 import { select } from "../db/supabase.ts";
 import type { Place } from "./placeTypes.ts";
 import { distanceM } from "./snap.ts";

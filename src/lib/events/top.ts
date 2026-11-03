@@ -16,7 +16,7 @@ import { roadLabel } from "../official/queue.ts";
 import { EVENT_SELECT, toMapEvent, type EventRow } from "./queries.ts";
 import type { EventStatus, TopItem, TopResult } from "./types.ts";
 
-/** Himachal Pradesh bbox (CLAUDE.md 7.6). */
+/** Himachal Pradesh bbox (SEQUENCE.md 7.6). */
 const HP: [number, number, number, number] = [75.5, 30.3, 79.0, 33.3];
 
 /**

@@ -1,4 +1,4 @@
-// Server-only: tools for the Route Check agent (CLAUDE.md 6.4). Every tool is plain code over the
+// Server-only: tools for the Route Check agent (SEQUENCE.md 6.4). Every tool is plain code over the
 // route plan (OSRM + events, already computed), the database or Open-Meteo — the model only reasons.
 import type OpenAI from "openai";
 import { z } from "zod";

@@ -1,5 +1,5 @@
 // Client-safe, plain code (no AI): debris volume → clearing time, and the reopening predictor.
-// Every number is a range (CLAUDE.md 6.2 rule 2); no basis → null, never a made-up number.
+// Every number is a range (SEQUENCE.md 6.2 rule 2); no basis → null, never a made-up number.
 //
 // Volume on the carriageway = blocked length × blocked width × depth. Length and width come from the
 // SAM measurements (metres via a reference object or the two-lane assumption); depth can't be seen

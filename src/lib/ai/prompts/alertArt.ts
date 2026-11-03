@@ -1,6 +1,6 @@
 // Versioned prompt: Muse Image illustration for a shareable alert card (frame 11). The illustration has
 // NO text — the exact English + Hindi lines are set by code next to it (an image model can misspell
-// Devanagari, and this goes to the public). Never built from an evidence photo (CLAUDE.md 6.2 rule 4).
+// Devanagari, and this goes to the public). Never built from an evidence photo (SEQUENCE.md 6.2 rule 4).
 export const ALERT_ART_PROMPT_VERSION = "alert-art-v1";
 
 const SCENE: Record<string, string> = {

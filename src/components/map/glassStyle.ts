@@ -1,5 +1,5 @@
 // Restyle the OpenFreeMap "liberty" style to the Pathfinder Glass map look
-// (CLAUDE.md 7.6 + docs/design/glass-html/Map.dc.html). Works on layer ids, so it
+// (SEQUENCE.md 7.6 + docs/design/glass-html/Map.dc.html). Works on layer ids, so it
 // degrades gracefully if OpenFreeMap renames a layer (that layer just keeps its colour).
 import type { StyleSpecification } from "maplibre-gl";
 

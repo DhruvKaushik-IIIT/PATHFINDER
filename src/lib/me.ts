@@ -1,4 +1,4 @@
-// Server-only: who is this traveller? No sign-up for the public (CLAUDE.md 1): each device gets an
+// Server-only: who is this traveller? No sign-up for the public (SEQUENCE.md 1): each device gets an
 // anonymous `users` row on first need, remembered in an httpOnly cookie. Officials sign in (Phase 4).
 import { cookies } from "next/headers.js"; // .js so plain-node scripts can import this file too
 import { insert, select, update } from "./db/supabase.ts";

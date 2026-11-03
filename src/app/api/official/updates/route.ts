@@ -1,6 +1,6 @@
 // POST /api/official/updates (multipart: eventId, photo, status, pctCleared, fullyOpenBy?, machines?, voice?)
 // → Field update: photo (required) + SAM progress check + event status/ETA/timeline. Then Road Watch
-// re-checks trips through that spot (after the response, event-driven — CLAUDE.md 5.4).
+// re-checks trips through that spot (after the response, event-driven — SEQUENCE.md 5.4).
 import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { FieldError, postFieldUpdate } from "@/lib/official/fieldUpdate.ts";

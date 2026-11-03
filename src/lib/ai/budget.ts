@@ -1,4 +1,4 @@
-// Server-only: the global daily AI spend cap (Phase 6D, CLAUDE.md 5.4). Every router job checks it first;
+// Server-only: the global daily AI spend cap (Phase 6D, SEQUENCE.md 5.4). Every router job checks it first;
 // over the cap the job skips the providers and returns its existing no-AI last resort (code verdicts,
 // templates, "measurement unavailable") — the app degrades, it never crashes.
 // Spend today = ai_calls.cost_usd since IST midnight (re-read every 60 s) + calls this instance logged since.

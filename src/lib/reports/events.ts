@@ -1,4 +1,4 @@
-// Server-only: Verifier v1 world-state update (CLAUDE.md 6.1 VERIFY → WORLD STATE).
+// Server-only: Verifier v1 world-state update (SEQUENCE.md 6.1 VERIFY → WORLD STATE).
 // A verified claim either merges into the open event on the same segment (seen in the last
 // 24 h) or creates a new one. Every change adds a timeline item. Latest verified evidence wins
 // for status (roads change by the hour); confidence grows with independent confirmations.

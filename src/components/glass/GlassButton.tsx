@@ -1,4 +1,4 @@
-// Floating glass button over the map: circle (default) or rounded square (14 px), 46 px (CLAUDE.md 7.3/7.4).
+// Floating glass button over the map: circle (default) or rounded square (14 px), 46 px (SEQUENCE.md 7.3/7.4).
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
 export default function GlassButton({

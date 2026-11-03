@@ -1,4 +1,4 @@
-// Client-safe formatting for event estimates (CLAUDE.md 6.2: every number "~", never fake precision).
+// Client-safe formatting for event estimates (SEQUENCE.md 6.2: every number "~", never fake precision).
 import type { Range } from "./types";
 
 /** "~35 m" when tight, "~30–40 m" when not, null when unknown. */

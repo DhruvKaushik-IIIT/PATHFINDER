@@ -1,7 +1,7 @@
 // Client-safe: the field update "AI check" (frame 15). SAM measures the new progress photo; this pure
 // function compares it with the event's earliest photo and with what the official entered. Runs in the
 // browser (live while the slider moves) and again on the server when the update is posted.
-// Rule 7 (CLAUDE.md 6.2): a mismatch is flagged, never silently accepted or silently overwritten.
+// Rule 7 (SEQUENCE.md 6.2): a mismatch is flagged, never silently accepted or silently overwritten.
 
 export type FieldStatus = "clearing" | "one_lane" | "open";
 
