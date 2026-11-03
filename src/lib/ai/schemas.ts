@@ -53,6 +53,9 @@ export const Verdict = z.object({
   correctedEventType: z.enum(EVENT_TYPES).nullable(),
   /** Potholes only: set when the claim's potholeSize is wrong. */
   correctedPotholeSize: z.enum(POTHOLE_SIZES).nullable().optional(),
+  /** B4: signs the image was downloaded/forwarded rather than just taken at the spot (watermark, logo, screenshot…). */
+  looksDownloaded: z.boolean().nullable().optional(),
+  downloadSigns: z.string().nullable().optional(),
   reasoning: z.string(),
 });
 export type Verdict = z.infer<typeof Verdict>;

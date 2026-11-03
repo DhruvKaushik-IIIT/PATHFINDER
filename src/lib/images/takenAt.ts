@@ -1,6 +1,7 @@
 // Browser-only: when was a library photo taken? EXIF DateTimeOriginal (read before the canvas resize
-// strips it), else the file's last-modified time. EXIF has no time zone: phones write local time, so
-// it is read as IST. Camera shots from /report are "now" and don't need this.
+// strips it). EXIF has no time zone: phones write local time, so it is read as IST. Camera shots from
+// /report are "now" and don't need this. No camera date → null (B4: NOT the file's last-modified time —
+// for a downloaded or forwarded image that is the download time, which made internet photos look fresh).
 const EXIF_DATE = /(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})/g;
 
 export async function takenAt(file: File): Promise<string | null> {
@@ -15,5 +16,5 @@ export async function takenAt(file: File): Promise<string | null> {
   } catch {
     /* unreadable → fall back */
   }
-  return file.lastModified ? new Date(file.lastModified).toISOString() : null;
+  return null;
 }

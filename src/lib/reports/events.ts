@@ -48,6 +48,8 @@ export interface EventUpdate {
   photoAgeH?: number | null;
   /** SAM's own numbers for the photo (road width, etc.), merged under the claim's. */
   sam?: { roadTotalWidthM?: Range; blockedLengthM?: Range; blockedPct?: Range } | null;
+  /** B4: why this photo can't count as "taken here, now" (no camera data / looks downloaded). Never makes or moves a pin. */
+  unverifiedUpload?: string | null;
   /** Placed on the map by someone not at the spot (/report "Pick a spot", B1): demo data — it only merges into
    *  demo events (never touches real ones) and a new event is is_demo + sources.placed (expires like a real one). */
   placed?: boolean;
@@ -146,6 +148,15 @@ export async function applyToWorldState(u: EventUpdate): Promise<EventResult> {
         ...(u.verification && { verification: u.verification }),
       },
     });
+
+  // B4: an uploaded photo with no proof it was taken here and now (no camera data, or the checker saw a
+  // watermark/logo/screenshot). Kept on the record, never creates a pin or changes a status, no points.
+  if (u.unverifiedUpload && !u.placed) {
+    const note = `${u.unverifiedUpload} — not counted until someone on the spot confirms it with the camera`;
+    if (!existing) return { eventId: null, action: "none", reportStatus: "pending", eventReports: 0, timeCheck: note };
+    await timeline(existing.id, `Uploaded photo, not counted (${u.unverifiedUpload.toLowerCase()}): ${claim.summary}`);
+    return { eventId: existing.id, action: "noted", reportStatus: "pending", eventReports: existing.sources?.reports ?? 0, timeCheck: note };
+  }
 
   // Old photo (library pick): evidence of what WAS there, never the current state.
   if (u.photoAgeH != null && u.photoAgeH > OLD_PHOTO_H) {
