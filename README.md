@@ -127,9 +127,9 @@ flowchart LR
 <td width="33%" align="center"><img src="docs/screenshots/11-crew-my-job.jpg" width="240" alt="Crew My job screen"/><br/><b>Crew "My job"</b><br/><sub>For the supervisor on site: on-duty switch, the job, directions, "I've arrived", progress updates.</sub></td>
 </tr>
 <tr>
-<td align="center"><img src="docs/screenshots/12-field-update.jpg" width="240" alt="Field update"/><br/><b>Field update from the site</b><br/><sub>Progress photo (required) + % cleared + Hindi voice note. SAM checks the photo against the last one; mismatches are flagged, never hidden.</sub></td>
 <td align="center"><img src="docs/screenshots/05-vehicle-fit.jpg" width="240" alt="Can my vehicle cross"/><br/><b>Can my vehicle cross?</b><br/><sub>Vehicle width from a spec table, gap from SAM measurements, maths in code. Two models look at road + vehicle photos and can only make the verdict <i>stricter</i>.</sub></td>
 <td align="center"><img src="docs/screenshots/06-slope-sentinel.jpg" width="240" alt="Slope Sentinel"/><br/><b>Slope Sentinel</b><br/><sub>Photos of the hillside <i>above</i> the road, read like a field geologist (cracks, seepage, loose rock) × rain forecast × slide history → watch / elevated / high. Advice only — never closes a road.</sub></td>
+<td align="center"><sub><b>Field updates from the site</b> — progress photo (required) + % cleared + Hindi voice note; SAM checks the photo against the last one, mismatches are flagged, never hidden. <b>See the live loop below ↓</b></sub></td>
 </tr>
 </table>
 
