@@ -1,6 +1,6 @@
 "use client";
 
-// Bottom sheet with grabber and 3 detents (peek / half / full), drag + snap (CLAUDE.md 7.4).
+// Bottom sheet with grabber and 3 detents (peek / half / full), drag + snap (SEQUENCE.md 7.4).
 // Plain pointer events — no animation library. Spring-like easing; instant under reduced motion.
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 

@@ -1,4 +1,4 @@
-// Server-only: sign-in for officials and road crews (CLAUDE.md 7.5 frame 13). Invite-only: an account
+// Server-only: sign-in for officials and road crews (SEQUENCE.md 7.5 frame 13). Invite-only: an account
 // is a Supabase Auth user (created by scripts/create-official.ts with the service role) PLUS a `users`
 // row with role official/crew/admin linked by auth_user_id. Signing up through Supabase alone gives no
 // access — the role check below is the gate. Plain fetch to Supabase Auth (GoTrue), no SDK.

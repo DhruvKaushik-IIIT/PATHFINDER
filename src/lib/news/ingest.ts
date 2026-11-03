@@ -1,4 +1,4 @@
-// Server-only: news ingest (CLAUDE.md 6.1 INPUTS "news", Phase 3 cold-start fix).
+// Server-only: news ingest (SEQUENCE.md 6.1 INPUTS "news", Phase 3 cold-start fix).
 // 1. Meta Spark + web_search → a cited digest of recent HP road news.
 // 2. Baseten Spark Open → structured NewsItems (a second model reads the first one's digest).
 // 3. Rules in code: cited URL only, published ≤ 72 h ago, place geocoded inside HP.

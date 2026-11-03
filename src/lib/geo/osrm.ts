@@ -1,4 +1,4 @@
-// Server-only: OSRM routing (public demo server — cache results, CLAUDE.md section 3). No AI.
+// Server-only: OSRM routing (public demo server — cache results, SEQUENCE.md section 3). No AI.
 // overview=full + annotations give per-segment distance/duration, so ETAs along the route are exact.
 const OSRM = process.env.OSRM_URL || "https://router.project-osrm.org";
 const TTL_MS = 30 * 60_000;

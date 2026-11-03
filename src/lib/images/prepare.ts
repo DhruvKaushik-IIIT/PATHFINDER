@@ -1,4 +1,4 @@
-// Server-only: normalise a photo before storage or any AI call (CLAUDE.md 5.4, 6.2).
+// Server-only: normalise a photo before storage or any AI call (SEQUENCE.md 5.4, 6.2).
 // Output is a JPEG with ALL metadata dropped (EXIF/GPS/XMP), auto-rotated, max 1280 px.
 import sharp from "sharp";
 

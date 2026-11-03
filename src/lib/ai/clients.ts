@@ -24,7 +24,7 @@ export function hasKey(provider: Provider): boolean {
 }
 
 // Retries are handled by the router (backoff + fallback), so the SDK's own
-// retries are off. Timeouts follow CLAUDE.md 5.7: 30 s text, 60 s agents.
+// retries are off. Timeouts follow SEQUENCE.md 5.7: 30 s text, 60 s agents.
 function make(baseURL: string, apiKey: string | undefined, timeoutMs: number): OpenAI {
   return new OpenAI({ baseURL, apiKey: apiKey || "missing", timeout: timeoutMs, maxRetries: 0 });
 }

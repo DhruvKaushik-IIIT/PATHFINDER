@@ -1,4 +1,4 @@
-// Server-only: the Investigator (CLAUDE.md 6.1 VERIFY, Phase 5). When an event is doubtful (low
+// Server-only: the Investigator (SEQUENCE.md 6.1 VERIFY, Phase 5). When an event is doubtful (low
 // confidence, stale, past its clearing time, news-only) the agent gathers evidence and explains it.
 // Code decides what that changes: confidence moves at most ±0.15 per run, the STATUS never changes
 // (only new evidence — a photo, an official update, a news item — does that), a suspected change is

@@ -1,4 +1,4 @@
--- Phase 0: road segments (what events snap to) + named places. CLAUDE.md section 8.
+-- Phase 0: road segments (what events snap to) + named places. SEQUENCE.md section 8.
 create extension if not exists postgis;
 
 create table if not exists road_segments (

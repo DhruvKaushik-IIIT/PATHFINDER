@@ -1,4 +1,4 @@
-// Server-only: A → B route plan WITHOUT any AI call (CLAUDE.md 7.5b / 7.5c).
+// Server-only: A → B route plan WITHOUT any AI call (SEQUENCE.md 7.5b / 7.5c).
 // OSRM routes → split at the Himachal border → open events on the HP part → ETAs with delays
 // → a verdict built in plain code. The Route Check agent (Phase 2 Part B) reasons on top of this.
 import { booleanPointInPolygon, lineString, nearestPointOnLine, point, simplify } from "@turf/turf";

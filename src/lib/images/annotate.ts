@@ -1,5 +1,5 @@
 // Server-only: AI-annotated copy of a report photo, drawn by CODE (sharp + SVG) from SAM masks and
-// the verified claim (CLAUDE.md 6.2 rule 4). Drawn on the privacy-blurred copy and stored next to
+// the verified claim (SEQUENCE.md 6.2 rule 4). Drawn on the privacy-blurred copy and stored next to
 // it — the evidence photo itself is never altered. Look follows docs/design/glass-html/Photos.dc.html.
 import { decodeMaskToSVGPath } from "@meta-sam/parser";
 import "./fonts.ts"; // must run before sharp renders SVG text (Vercel has no system fonts)

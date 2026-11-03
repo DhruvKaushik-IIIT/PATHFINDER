@@ -1,5 +1,5 @@
 // Admin: create (or update) an invite-only official / crew account. There is no public sign-up for
-// the Command Centre — this script, run with the service role, is the only way in (CLAUDE.md 7.5, 8).
+// the Command Centre — this script, run with the service role, is the only way in (SEQUENCE.md 7.5, 8).
 // An account = a Supabase Auth user (login email derived from the Department ID) + a `users` row
 // with the role, org and district. Re-running updates the password/org instead of duplicating.
 //

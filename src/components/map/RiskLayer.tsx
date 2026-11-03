@@ -1,6 +1,6 @@
 "use client";
 
-// Risk areas on the map (CLAUDE.md 7.6): purple 22% fill, dashed outline; light rain fainter.
+// Risk areas on the map (SEQUENCE.md 7.6): purple 22% fill, dashed outline; light rain fainter.
 import type { MultiPolygon, Polygon } from "geojson";
 import { Layer, Source } from "react-map-gl/maplibre";
 import type { RiskLevel } from "@/lib/risk/types";

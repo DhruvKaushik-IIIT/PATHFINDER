@@ -1,4 +1,4 @@
-// Server-only: the ONE place AI providers are called from (CLAUDE.md 5.7).
+// Server-only: the ONE place AI providers are called from (SEQUENCE.md 5.7).
 // Pages and API routes call job functions exported here, never a client directly.
 // Rules: retry 429/5xx/timeouts twice with backoff, trip a 10-minute circuit
 // breaker on auth/billing errors, fall back to the next provider, and never throw.
@@ -156,7 +156,7 @@ interface Usage {
   outputTokens: number;
 }
 
-// USD per 1M tokens (CLAUDE.md 5.4). Baseten pricing is billed separately → null for now.
+// USD per 1M tokens (SEQUENCE.md 5.4). Baseten pricing is billed separately → null for now.
 const PRICES: Record<string, { input: number; cached: number; output: number }> = {
   [MODELS.spark]: { input: 1.25, cached: 0.15, output: 4.25 },
   [MODELS.spark12]: { input: 1.25, cached: 0.15, output: 4.25 },

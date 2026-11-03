@@ -2,7 +2,7 @@
 //  A. Meta Muse Voice Transcribe, language auto-detect
 //  B. Meta Muse Voice Transcribe, languageBias=hindi + place-name keywords
 //  C. Baseten Spark Open with audio input (chat completions `input_audio`)
-//  D. Meta muse-spark-1.2 with audio input (CLAUDE.md: better audio than 1.3)
+//  D. Meta muse-spark-1.2 with audio input (SEQUENCE.md: better audio than 1.3)
 // Voice follows cookbook 06_muse_voice/01. C/D use the OpenAI `input_audio` part (no recipe exists).
 // Run: pnpm test:voice [audio]   (default data/seed/voice/hindi-note-1.m4a; needs ffmpeg)
 import { execFileSync } from "node:child_process";

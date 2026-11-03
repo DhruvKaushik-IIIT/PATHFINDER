@@ -1,5 +1,5 @@
 // Server-only: Route Check = code plan (no AI) + the agent's verdict on top, with the budget rules
-// from CLAUDE.md 5.4: no events → no AI; one event → Spark; several / a closure → Wonder.
+// from SEQUENCE.md 5.4: no events → no AI; one event → Spark; several / a closure → Wonder.
 // Cached 20 min per (trip, 30-min departure window, event state).
 import { routeCheck, type RouteCheckOutput } from "../ai/router.ts";
 import type { RouteVerdict } from "../ai/schemas.ts";

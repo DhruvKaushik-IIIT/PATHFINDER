@@ -1,4 +1,4 @@
-// Server-only: tools for the Investigator agent (CLAUDE.md 6.4). Plain code over the event's claims,
+// Server-only: tools for the Investigator agent (SEQUENCE.md 6.4). Plain code over the event's claims,
 // official updates, the reopening predictor and Open-Meteo; one grounded web search per run.
 import type OpenAI from "openai";
 import { z } from "zod";

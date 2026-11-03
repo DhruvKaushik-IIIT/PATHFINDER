@@ -41,7 +41,7 @@ export function unconfirmedLine(e: { status: EventStatus; lastConfirmedAt: strin
   return `Unconfirmed · last report ${ago(e.lastConfirmedAt, now)} · was ${was}`;
 }
 
-// CLAUDE.md 7.2 — status is ALWAYS word + colour.
+// SEQUENCE.md 7.2 — status is ALWAYS word + colour.
 export const STATUS_STYLE: Record<EventStatus, { dot: string; bg: string; ink: string; word: string }> = {
   open: { dot: "#1E7B45", bg: "rgba(52,199,89,0.16)", ink: "#1A6B35", word: "Open" },
   slow: { dot: "#C25E00", bg: "rgba(255,159,10,0.20)", ink: "#8A4300", word: "Slow" },

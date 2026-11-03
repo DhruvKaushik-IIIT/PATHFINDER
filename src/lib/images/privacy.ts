@@ -1,4 +1,4 @@
-// Server-only: blur faces + number plates before a photo can be public (CLAUDE.md 6.2 rule 5).
+// Server-only: blur faces + number plates before a photo can be public (SEQUENCE.md 6.2 rule 5).
 // Boxes come from SAM ("face", "license plate"). If SAM couldn't run we can't know what's in
 // the photo, so the public copy becomes a small, heavily blurred thumbnail (5.7 last resort).
 import sharp from "sharp";

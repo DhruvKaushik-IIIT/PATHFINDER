@@ -123,7 +123,7 @@ Cookbook: https://github.com/meta-models/meta-model-cookbook
 ---
 
 ## 7. Hackathon-specific notes
-- $150 Meta credits are active on the account (spend alert at $120). No card linked yet — whether Meta requires one is tested in Phase 0 (`hello-meta`). If calls fail with a payment error, the app falls back to Baseten (see CLAUDE.md 5.7).
+- $150 Meta credits are active on the account (spend alert at $120). No card linked yet — whether Meta requires one is tested in Phase 0 (`hello-meta`). If calls fail with a payment error, the app falls back to Baseten (see SEQUENCE.md 5.7).
 - Baseten: $100 credits approved, endpoint `https://inference.baseten.co/v1`, OpenAI Chat Completions, key `BASETEN_API_KEY`.
 - Baseten model ID for the hackathon: `meta-models/muse-spark-open-1026` (not `muse-spark-open`).
 - Open-weights bonus prize needs Muse Spark Open or Muse Glimmer — realistically via Baseten/Modal.

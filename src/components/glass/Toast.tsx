@@ -1,4 +1,4 @@
-// Small glass toast (CLAUDE.md 5.7 rule 3): degraded AI or a recoverable error, never an error screen.
+// Small glass toast (SEQUENCE.md 5.7 rule 3): degraded AI or a recoverable error, never an error screen.
 export default function Toast({ message, dark = false, onClose }: { message: string; dark?: boolean; onClose?: () => void }) {
   return (
     <div

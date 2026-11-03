@@ -1,4 +1,4 @@
-// Crew Dispatch maths, in plain code (CLAUDE.md 6.4: vehicle-hours are computed, never guessed by AI).
+// Crew Dispatch maths, in plain code (SEQUENCE.md 6.4: vehicle-hours are computed, never guessed by AI).
 // A plan = which crew goes to which event, in order. `evaluate()` simulates it: crews travel from the
 // district base (or their last job), a crew on site clears faster, and every event's lost vehicle-hours
 // (next 24 h) are summed. `greedyPlan()` is the no-AI plan; the agent may propose a better order and

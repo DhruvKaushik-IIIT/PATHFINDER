@@ -1,4 +1,4 @@
-// Server-only: the whole report pipeline (CLAUDE.md 6.1), used by POST /api/reports.
+// Server-only: the whole report pipeline (SEQUENCE.md 6.1), used by POST /api/reports.
 //   photo → privacy + SAM measurements ┐
 //   voice → transcript                 ├ in parallel
 //   GPS   → road segment + place name  ┘

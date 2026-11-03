@@ -1,5 +1,5 @@
 // Phase 0: does Muse Spark Open on Baseten support tool calling?
-// Decides whether Baseten can be the fallback for the Wonder agents (CLAUDE.md 5.7).
+// Decides whether Baseten can be the fallback for the Wonder agents (SEQUENCE.md 5.7).
 // Follows cookbook 01_api_fundamentals/03 (Chat Completions tools, call → feed back loop).
 // Run: pnpm test:tools-baseten
 import type OpenAI from "openai";

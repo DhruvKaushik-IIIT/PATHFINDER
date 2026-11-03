@@ -16,8 +16,8 @@
 | Alerts.dc.html | 09 Alerts | /alerts |
 | Report.dc.html | 10 Report | /report |
 | ReportDone.dc.html | 10b Report sent | /report/done |
-| ControlRoom.dc.html | ⚠️ OLD desktop version of 14 — build 14 as the PHONE layout in CLAUDE.md 7.5 | /official |
+| ControlRoom.dc.html | ⚠️ OLD desktop version of 14 — build 14 as the PHONE layout in SEQUENCE.md 7.5 | /official |
 | FieldUpdate.dc.html | 15 Field update | /official/field/[id] |
 | Map.dc.html | shared map look | MapView |
 
-Screens with no HTML file (04, 10c, 11, 12, 13, 14, 14b): follow CLAUDE.md 7.5 and the Figma PNGs.
+Screens with no HTML file (04, 10c, 11, 12, 13, 14, 14b): follow SEQUENCE.md 7.5 and the Figma PNGs.

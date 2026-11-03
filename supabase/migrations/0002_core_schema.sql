@@ -1,4 +1,4 @@
--- Phase 1: full data model (CLAUDE.md section 8) + RLS basics + photo storage buckets.
+-- Phase 1: full data model (SEQUENCE.md section 8) + RLS basics + photo storage buckets.
 -- Idempotent: safe to paste into the Supabase SQL Editor more than once.
 -- Server code writes with the service role (bypasses RLS); RLS below governs the anon/auth keys.
 create extension if not exists postgis;

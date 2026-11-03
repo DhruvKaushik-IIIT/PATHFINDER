@@ -1,4 +1,4 @@
-// Zod schemas for every AI output (CLAUDE.md 6.2 rule 1, 6.3). The same schema drives the
+// Zod schemas for every AI output (SEQUENCE.md 6.2 rule 1, 6.3). The same schema drives the
 // request (`response_format: json_schema`) and the validation of the reply.
 import { z } from "zod";
 

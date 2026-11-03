@@ -1,7 +1,7 @@
 // POST /api/reports (multipart: photo, lat, lng, text?, voice? as WAV, kind? road|slope) → claim + verified event,
 // or with kind=slope → a checked slope reading on a slope site (Phase 6B).
 // The pipeline lives in src/lib/reports/submit.ts.
-// Contract (CLAUDE.md 5.7): AI trouble never errors → { ok: true, data, degraded? }.
+// Contract (SEQUENCE.md 5.7): AI trouble never errors → { ok: true, data, degraded? }.
 import { after, NextResponse } from "next/server";
 import { z } from "zod";
 import { hasDb } from "@/lib/db/supabase.ts";

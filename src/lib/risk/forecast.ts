@@ -1,4 +1,4 @@
-// Server-only: Risk Forecast v1 (CLAUDE.md Phase 3 task 5). Plain code, no AI:
+// Server-only: Risk Forecast v1 (SEQUENCE.md Phase 3 task 5). Plain code, no AI:
 // Open-Meteo hourly rain/snow at points along a route (at the time you'd be there) or on a grid
 // around a place, × landslides/road damage seen nearby in the last 90 days → none/low/moderate/high.
 // Optional "replay" swaps the live forecast for a real past day saved by scripts/fetch-weather-replay.ts

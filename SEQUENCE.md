@@ -1,4 +1,4 @@
-# CLAUDE.md — Pathfinder (Meta Global AI Developer Hackathon)
+# SEQUENCE.md — Pathfinder (Meta Global AI Developer Hackathon)
 
 > Read this whole file at the start of every session. It is the single source of truth for this project.
 
@@ -101,7 +101,7 @@ Package manager: **pnpm** (or npm if pnpm is not installed — ask once).
 
 ```
 pathfinder/
-├─ CLAUDE.md
+├─ SEQUENCE.md
 ├─ README.md
 ├─ .env.example            # names only, no values
 ├─ .env.local              # real keys (git-ignored)

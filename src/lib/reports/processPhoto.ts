@@ -1,4 +1,4 @@
-// Server-only: photo half of the report pipeline (CLAUDE.md 6.1 INGEST).
+// Server-only: photo half of the report pipeline (SEQUENCE.md 6.1 INGEST).
 // raw upload → strip EXIF + resize → SAM (privacy + measurement concepts, in parallel)
 // → blurred public copy → measurements. Never throws on AI failure; it degrades instead.
 import { createHash } from "node:crypto";

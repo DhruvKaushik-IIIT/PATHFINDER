@@ -32,7 +32,7 @@ const STEPS = [
 
 type Loc = { lat: number; lng: number };
 
-// Himachal's bounding box (CLAUDE.md 7.6): GPS outside it can't report on an HP road → "Pick a spot" (B1).
+// Himachal's bounding box (SEQUENCE.md 7.6): GPS outside it can't report on an HP road → "Pick a spot" (B1).
 const inHp = (l: Loc) => l.lat >= 30.3 && l.lat <= 33.3 && l.lng >= 75.5 && l.lng <= 79.0;
 const NO_GPS = "We couldn't get your location. Choose where your photo should go.";
 const OUTSIDE = "You seem to be outside Himachal. Pathfinder checks Himachal roads, so place your report on one.";
